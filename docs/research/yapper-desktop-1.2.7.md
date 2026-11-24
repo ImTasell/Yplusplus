@@ -112,13 +112,27 @@ The main process checks HTTPS and these hosts before loading the app page. The Y
 
 ### Automatic updates
 
-The packaged app includes `resources/app-update.yml` with a generic update provider at `https://www.yapper.website/download`.
+The packaged app includes `resources/app-update.yml` with this verified configuration:
+
+```yaml
+provider: generic
+url: https://www.yapper.website/download
+updaterCacheDirName: yapper-desktop-updater
+```
+
+The packaged `electron-updater` version is **6.8.11**. Its Linux channel naming code requests `latest-linux.yml` for x64 (and `latest-linux-<arch>.yml` for other architectures). Its generic provider parses the channel YAML, resolves the file URLs against the configured feed, and its AppImage updater selects an `.AppImage` file from the manifest.
 
 The main process configures `electron-updater` to auto-download updates and install them on app quit. It checks shortly after startup and periodically thereafter.
 
 This means a patch applied to one app version may disappear after an upstream update. Y++ Bootstrap must detect version changes, verify patch anchors, and reapply a compatible patch before launching. If the new version does not match the known structure, it must fail closed and launch unmodified Yapper rather than corrupting the app.
 
-The exact Linux AppImage updater replacement behavior still needs a dedicated test. Do not assume the updater preserves an extracted or patched AppDir.
+The exact Linux AppImage updater behavior was inspected directly in the packaged `node_modules/electron-updater/out/AppImageUpdater.js`:
+
+- `isUpdaterActive()` returns false when `APPIMAGE` is unset.
+- `doInstall()` reads `process.env.APPIMAGE`, unlinks that path, moves the downloaded AppImage into the destination, and launches it.
+- This confirms why Y++ must keep `APPIMAGE` unset when launching an extracted AppDir.
+
+The update manager uses the generic Linux channel metadata and verifies the downloaded AppImage against its SHA-512 and declared size before extraction. The live `latest-linux.yml` response was not retrievable from the research environment, so the parser is tested against the electron-updater 6.8.11 metadata shape but the current upstream feed payload still needs a live network smoke test.
 
 ### AppImage filesystem
 
