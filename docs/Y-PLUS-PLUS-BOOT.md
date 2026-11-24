@@ -87,9 +87,11 @@ node --experimental-strip-types src/cli.ts restore /tmp/yapper-extract/squashfs-
 
 **The original AppImage is never modified.** The current CLI only operates on an extracted AppDir. It does not yet build a replacement AppImage or install a desktop launcher.
 
+A one-time GitHub Actions integration run extracted the captured official 1.2.7 AppImage, inspected its real ASAR, patched it successfully, verified the patch marker, restored the backup, and compared the restored archive byte-for-byte with the original. The temporary integration job was removed after that check.
+
 ## Known limitations
 
-- This proves patch construction and archive integrity; it does not yet prove the preload executes inside a live Yapper window.
+- The real AppImage archive patch/restore path and ASAR integrity metadata have been verified in GitHub Actions; this does not yet prove the preload executes inside a live Yapper window.
 - The preload script must be bundled as a sandbox-compatible single file. The current emitted source is self-contained.
 - AppImage updater behavior has not been validated. Do not use this patched AppDir as a daily driver until update behavior and rollback are tested.
 - A successful patch is not a guarantee of compatibility with any Yapper version other than 1.2.7.
