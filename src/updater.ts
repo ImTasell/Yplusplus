@@ -1,9 +1,9 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import {
   chmodSync,
-  createReadStream,
   createWriteStream,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync
@@ -327,6 +327,7 @@ export async function downloadVerifiedAppImage(
   fetcher: UpdateFetcher = fetch
 ): Promise<{ bytes: number; sha512: string }> {
   const url = validateOfficialUrl(file.url);
+  mkdirSync(dirname(destination), { recursive: true });
   if (file.size !== undefined && (file.size <= 0 || file.size > MAX_APPIMAGE_BYTES)) {
     throw new Error("Yapper update AppImage size is outside the allowed range.");
   }
@@ -405,6 +406,7 @@ export async function updateYapper(
     ? process.env.XDG_DATA_HOME
     : join(homedir(), ".local", "share");
   const downloadsDir = join(dataHome, "yplusplus", "downloads");
+  mkdirSync(downloadsDir, { recursive: true });
   const stagingDir = mkdtempSync(join(downloadsDir, ".yplusplus-update-"));
   const imagePath = join(stagingDir, "Yapper-Update.AppImage");
 
