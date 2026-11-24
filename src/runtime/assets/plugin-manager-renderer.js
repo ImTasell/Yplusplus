@@ -74,7 +74,7 @@ function renderPlugin(plugin) {
   } else {
     actions.append(button("Revoke trust", () => perform(() => api.untrust(plugin.id, plugin.version)), "danger"));
   }
-  const pending = plugin.requestedPermissions.filter((item) => !plugin.approvedPermissions.includes(item));
+  const pending = plugin.deniedPermissions.filter((item) => item.reason === "not-approved").map((item) => item.id);
   if (plugin.trusted && pending.length) {
     actions.append(button("Approve requested capabilities", () => perform(() => api.approve(plugin.id, plugin.version, pending)), "primary"));
   }
