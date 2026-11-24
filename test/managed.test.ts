@@ -76,6 +76,8 @@ function makeRuntimeSource(dir: string): void {
   ]) {
     writeFileSync(join(dir, file), "// runtime fixture\n");
   }
+  mkdirSync(join(dir, "src", "runtime"), { recursive: true });
+  writeFileSync(join(dir, "src", "runtime", "bootstrap.js"), "// bootstrap fixture\n");
 }
 
 test("managed paths follow XDG_DATA_HOME and fall back to the user data directory", () => {
@@ -128,6 +130,7 @@ test("managed install patches atomically, installs its runtime and desktop entry
     assert.equal(inspectAppDir(first.appDir).patched, true);
     assert.equal(existsSync(first.appDir + "/resources/app.asar.yplusplus-original"), true);
     assert.equal(existsSync(join(first.runtimeDir, "cli.js")), true);
+    assert.equal(existsSync(join(first.runtimeDir, "src", "runtime", "bootstrap.js")), true);
     assert.equal(JSON.parse(readFileSync(join(first.runtimeDir, "package.json"), "utf8")).type, "module");
 
     const desktop = readFileSync(first.desktopFile, "utf8");
