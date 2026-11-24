@@ -112,6 +112,7 @@ function fixture(): ManagedPlugin {
     name: "Notification Example",
     version: "1.0.0",
     directory: "/unused",
+    entry: "index.js",
     state: "READY",
     requestedPermissions: ["ui.notifications"],
     approvedPermissions: ["ui.notifications"],
