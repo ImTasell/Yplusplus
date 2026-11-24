@@ -19,7 +19,7 @@ export interface PluginMessageChannel {
 export interface PluginExecutionHandle {
   /** Terminate the isolated execution context and wait for it to stop. */
   terminate(): Promise<void>;
-  /** Subscribe to unexpected worker exit/crash. */
+  /** Subscribe to unexpected isolated runtime exit/crash. */
   onExit(listener: (reason?: unknown) => void): () => void;
 }
 
