@@ -51,7 +51,7 @@ class TestPort implements RpcMessagePort {
   close(): void { this.closed = true; }
 }
 
-function setup(start: (pluginPort: RpcMessagePort) => Promise<PluginExecutionHandle>, timeout = 500) {
+function setup(start: (pluginPort: RpcMessagePort, signal?: AbortSignal) => Promise<PluginExecutionHandle>, timeout = 500) {
   const channels: Array<[TestPort, TestPort]> = [];
   const runtime = new PluginRuntimeHost({
     createChannel: () => {
@@ -61,7 +61,7 @@ function setup(start: (pluginPort: RpcMessagePort) => Promise<PluginExecutionHan
       return { hostPort, pluginPort };
     },
     createSession: () => ({ dispatch: async () => ({}) } as unknown as PluginRpcSession),
-    execution: { start: (_plugin, pluginPort) => start(pluginPort) },
+    execution: { start: (_plugin, pluginPort, signal) => start(pluginPort, signal) },
     startupTimeoutMs: timeout,
   });
   return { runtime, channels };
@@ -178,4 +178,17 @@ test("times out asynchronous capability session setup and closes both channel en
   assert.equal(hostPort.closed, true);
   assert.equal(pluginPort.closed, true);
   resolveSession({ dispatch: async () => ({}) } as unknown as PluginRpcSession);
+});
+
+
+test("aborts the execution adapter when runtime startup times out", async () => {
+  let receivedSignal: AbortSignal | undefined;
+  const { runtime, channels } = setup((_pluginPort, signal) => {
+    receivedSignal = signal;
+    return new Promise<PluginExecutionHandle>(() => undefined);
+  }, 100);
+  await assert.rejects(runtime.start(plugin()), /timed out/);
+  assert.equal(receivedSignal?.aborted, true);
+  assert.equal(channels[0]?.[0].closed, true);
+  assert.equal(channels[0]?.[1].closed, true);
 });
