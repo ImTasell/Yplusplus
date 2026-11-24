@@ -130,6 +130,7 @@ function plugin(directory: string): ManagedPlugin {
     directory,
     entry: "index.js",
     state: "READY",
+    trusted: true,
     requestedPermissions: ["ui.notifications"],
     approvedPermissions: ["ui.notifications"],
     deniedPermissions: [],
