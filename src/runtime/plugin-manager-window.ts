@@ -24,6 +24,7 @@ interface ManagerWindow {
   loadFile(path: string): Promise<void>;
   show(): void;
   focus(): void;
+  destroy(): void;
   isDestroyed(): boolean;
   once(event: "closed" | "ready-to-show", listener: () => void): this;
 }
@@ -147,6 +148,7 @@ export function createPluginManagerWindow(options: PluginManagerWindowOptions): 
         await created.loadFile(htmlPath);
       } catch (error) {
         for (const channel of CHANNELS) options.ipcMain.removeHandler(channel);
+        if (!created.isDestroyed()) created.destroy();
         window = undefined;
         throw error;
       }
