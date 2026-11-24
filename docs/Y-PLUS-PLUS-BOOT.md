@@ -47,6 +47,17 @@ The automated tests execute the actual generated preload source in an isolated J
 
 **Scope note:** these are deterministic policy/regression tests, not a claim that every possible Yapper OAuth popup flow has been exercised in a live desktop session. The previous live Electron test verified the bridge and original Yapper bridge coexist in the main renderer. Live popup/navigation verification remains part of desktop smoke testing.
 
+### Document lifecycle expectations
+
+The registered preload is a document-start hook, not a navigation event listener:
+
+- SPA `history.pushState()`, `replaceState()`, and fragment changes keep the existing document and its existing `window.yplusplus` object. The preload is not executed again.
+- A same-origin full document navigation or reload creates a new document; the matching preload runs again and exposes a fresh bridge object.
+- A top-level navigation or popup to a third-party origin creates a separate document context and is denied by the origin guard.
+- Returning to an approved Yapper/Yapin origin through a new document navigation bootstraps the bridge again.
+
+The navigation regression tests model those document-context boundaries while executing the actual preload source. They verify bridge persistence for same-document route changes, fresh bootstrap on reload, and denial on external navigation/popups. They do not replace an Electron-level test of Chromium's navigation lifecycle; that remains a useful final smoke test.
+
 ## Why the patcher edits the ASAR header
 
 The patcher uses a small ASAR reader/writer implemented with Node built-ins. It appends the replacement main-process source and new preload to the archive's data section, then updates only their offsets, sizes, and SHA-256 integrity metadata. Existing file payloads—including the original preload and the unpacked native dependency directory—are left in place.
