@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -16,7 +17,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BACKUP_SUFFIX, inspectAppDir, patchAppDir } from "./patcher.js";
 
-export const YPLUSPLUS_RUNTIME_VERSION = "0.1.1";
+export const YPLUSPLUS_RUNTIME_VERSION = "0.1.2";
 
 const RUNTIME_FILES = [
   "cli.js",
@@ -141,6 +142,11 @@ function installRuntime(runtimeParent: string, runtimeSourceDir: string): string
     for (const file of RUNTIME_FILES) {
       copyFileSync(join(runtimeSourceDir, file), join(stagingDir, file));
     }
+    const sourceModules = join(runtimeSourceDir, "src");
+    if (!existsSync(sourceModules) || !lstatSync(sourceModules).isDirectory()) {
+      throw new Error("Built Y++ source modules are missing. Run npm run build before installing.");
+    }
+    cpSync(sourceModules, join(stagingDir, "src"), { recursive: true, dereference: false });
     writeFileSync(
       join(stagingDir, "package.json"),
       JSON.stringify({
