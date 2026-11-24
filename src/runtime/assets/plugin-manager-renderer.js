@@ -109,7 +109,7 @@ async function refresh() {
   rejectedRoot.replaceChildren();
   rejectedSection.hidden = result.rejected.length === 0;
   for (const item of result.rejected) {
-    rejectedRoot.append(element("div", "rejected-item", item.directory + " — " + item.issues.map((issue) => issue.code).join(", "));
+    rejectedRoot.append(element("div", "rejected-item", item.directory + " — " + item.issues.map((issue) => issue.code).join(", ")));
   }
 }
 
