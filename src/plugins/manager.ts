@@ -20,6 +20,8 @@ export interface ManagedPlugin {
   readonly name: string;
   readonly version: string;
   readonly directory: string;
+  /** Entry captured during discovery and rechecked immediately before execution. */
+  readonly entry?: string;
   readonly state: PluginState;
   readonly requestedPermissions: readonly string[];
   readonly approvedPermissions: readonly string[];
@@ -72,6 +74,7 @@ async function inspectDiscoveredPlugin(
       name: plugin.manifest.name,
       version: plugin.manifest.version,
       directory: plugin.directory,
+      entry: plugin.manifest.entry,
       state,
       requestedPermissions: plugin.manifest.permissions,
       approvedPermissions: Object.freeze([]),
@@ -138,6 +141,7 @@ export async function inspectPlugins(
         name: plugin.manifest.name,
         version: plugin.manifest.version,
         directory: plugin.directory,
+        entry: plugin.manifest.entry,
         state: "FAILED" as const,
         requestedPermissions: plugin.manifest.permissions,
         approvedPermissions: Object.freeze([]),
