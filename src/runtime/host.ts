@@ -94,7 +94,7 @@ export class PluginRuntimeHost {
   }
 
   async start(plugin: ManagedPlugin): Promise<PluginRuntimeSnapshot> {
-    if (plugin.state !== "READY" || !plugin.compatibility.compatible) {
+    if (plugin.state !== "READY" || plugin.trusted !== true || !plugin.compatibility.compatible) {
       throw new Error("Only compatible READY plugins may be started.");
     }
     const existing = this.#records.get(plugin.id);
