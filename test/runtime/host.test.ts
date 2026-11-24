@@ -162,3 +162,20 @@ test("closes both channel endpoints if session construction fails", async () => 
   assert.equal(pluginPort.closed, true);
   assert.equal(runtime.get("dev.example.runtime"), undefined);
 });
+
+
+test("times out asynchronous capability session setup and closes both channel endpoints", async () => {
+  let resolveSession!: (value: PluginRpcSession) => void;
+  const hostPort = new TestPort();
+  const pluginPort = new TestPort();
+  const runtime = new PluginRuntimeHost({
+    createChannel: () => ({ hostPort, pluginPort }),
+    createSession: () => new Promise((resolve) => { resolveSession = resolve; }),
+    execution: { start: async () => handle().value },
+    startupTimeoutMs: 100,
+  });
+  await assert.rejects(runtime.start(plugin()), /session setup timed out/);
+  assert.equal(hostPort.closed, true);
+  assert.equal(pluginPort.closed, true);
+  resolveSession({ dispatch: async () => ({}) } as unknown as PluginRpcSession);
+});
