@@ -284,12 +284,13 @@ export function createElectronPluginExecutionAdapter(
       contents.on("destroyed", () => notifyExit(new Error("Plugin webContents was destroyed.")));
       window.once("closed", () => notifyExit(new Error("Plugin window was closed.")));
 
+      let cleanup = (): void => undefined;
       const onAbort = (): void => {
         notifyExit(new Error("Plugin startup was cancelled by the host."));
         cleanup();
       };
 
-      const cleanup = (): void => {
+      cleanup = (): void => {
         if (disposed) return;
         disposed = true;
         signal?.removeEventListener("abort", onAbort);
