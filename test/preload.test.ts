@@ -5,12 +5,12 @@ import { YPLUSPLUS_PRELOAD_SOURCE } from "../src/preload-source.js";
 
 type PreloadResult = {
   exposed: boolean;
-  api?: {
+  api: {
     version: string;
     runtime: string;
     ready: boolean;
     getStatus: () => { ready: boolean; version: string; origin: string };
-  };
+  } | undefined;
   errors: unknown[];
 };
 
