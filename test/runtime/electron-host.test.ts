@@ -110,6 +110,7 @@ class Window {
     isDestroyed: () => this.destroyed,
   };
   constructor(_options: unknown) { Window.latest = this; }
+  once(event: "closed", listener: () => void): this { this.listeners.set(event, listener); return this; }
   async loadFile(_filePath: string): Promise<void> {}
   destroy(): void {
     if (this.destroyed) return;
