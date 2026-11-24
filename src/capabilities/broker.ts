@@ -84,7 +84,8 @@ export async function createPluginCapabilityFacade(
   plugin: ManagedPlugin,
   options: CapabilityBrokerOptions,
 ): Promise<PluginCapabilityFacade> {
-  if (plugin.state !== "READY" || !plugin.compatibility.compatible) {
+  if (plugin.state !== "READY" || !plugin.compatibility.compatible ||
+      plugin.compatibility.pluginApiVersion !== plugin.compatibility.hostApiVersion) {
     throw new CapabilityDeniedError(
       "plugin.lifecycle",
       "Only compatible plugins in READY state can receive a capability facade.",
