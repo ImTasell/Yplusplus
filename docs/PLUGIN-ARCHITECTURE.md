@@ -76,7 +76,23 @@ Capabilities are narrow verbs, not broad namespaces such as `node`, `electron`, 
 4. Runtime checks on every operation (not just at plugin startup).
 5. Audit-friendly denial reasons without exposing secrets.
 
-No capability is implemented or granted by this RFC. Unknown capability identifiers can be preserved by manifest validation so newer plugins remain inspectable; the broker denies capabilities absent from its registry.\n\n### Persistent approval store\n\n`src/capabilities/approval-store.ts` stores explicit capability grants under the user's XDG config directory (`$XDG_CONFIG_HOME/yplusplus/permissions.json`, falling back to `~/.config/yplusplus/permissions.json`). Each record is keyed by the exact plugin ID and SemVer release, so upgrading a plugin does not silently inherit the previous release's grants.\n\nThe store supports per-capability revocation, release-wide revocation, and plugin-wide revocation. Writes are serialized within the process, staged in the same directory, and atomically renamed. The containing directory is set to mode `0700`; the file is written as `0600`. Symlink/non-regular-file targets, broad file permissions, malformed JSON, unknown schema fields, duplicate records, and invalid values fail closed. This is host-side persistence only; it does not itself decide whether a capability exists or is safe to grant.\n\nThe manager can consume the store as its trusted approval provider:\n\n```ts\nconst store = new PluginApprovalStore();\nconst report = await inspectPlugins(discovery, {\n  getApprovedPermissions: (pluginId, version) =>\n    store.getApprovedPermissions(pluginId, version),\n});\n```
+No capability is implemented or granted by this RFC. Unknown capability identifiers can be preserved by manifest validation so newer plugins remain inspectable; the broker denies capabilities absent from its registry.
+
+### Persistent approval store
+
+`src/capabilities/approval-store.ts` stores explicit capability grants under the user's XDG config directory (`$XDG_CONFIG_HOME/yplusplus/permissions.json`, falling back to `~/.config/yplusplus/permissions.json`). Each record is keyed by the exact plugin ID and SemVer release, so upgrading a plugin does not silently inherit the previous release's grants.
+
+The store supports per-capability revocation, release-wide revocation, and plugin-wide revocation. Writes are serialized within the process, staged in the same directory, and atomically renamed. The containing directory is set to mode `0700`; the file is written as `0600`. Symlink/non-regular-file targets, broad file permissions, malformed JSON, unknown schema fields, duplicate records, and invalid values fail closed. This is host-side persistence only; it does not itself decide whether a capability exists or is safe to grant.
+
+The manager can consume the store as its trusted approval provider:
+
+```ts
+const store = new PluginApprovalStore();
+const report = await inspectPlugins(discovery, {
+  getApprovedPermissions: (pluginId, version) =>
+    store.getApprovedPermissions(pluginId, version),
+});
+```
 
 ## Lifecycle contract
 
@@ -119,7 +135,8 @@ The exact worker technology is intentionally deferred until the manifest and lif
 - `src/plugins/discovery.ts`: immediate-child directory discovery, manifest validation, duplicate-ID rejection, and entry-point containment checks.
 - `src/plugins/compatibility.ts`: exact plugin API-generation compatibility policy.
 - `src/plugins/manager.ts`: discovery/compatibility/approval orchestration and lifecycle snapshot; stops at READY and never executes entries.
-- `src/capabilities/registry.ts`: capability catalog and pure grant-decision policy.\n- `src/capabilities/approval-store.ts`: persistent, version-scoped approval decisions with fail-closed validation and revocation.
+- `src/capabilities/registry.ts`: capability catalog and pure grant-decision policy.
+- `src/capabilities/approval-store.ts`: persistent, version-scoped approval decisions with fail-closed validation and revocation.
 
 ## Planned package boundaries
 
