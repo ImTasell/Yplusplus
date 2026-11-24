@@ -112,16 +112,11 @@ test("rejects accessor properties without invoking plugin-controlled getters", a
   assert.equal(getterCalls, 0);
 });
 
-test("does not grant a registered capability newer than the plugin API", async () => {
-  const facade = await createPluginCapabilityFacade(managedPlugin({
-    requestedPermissions: ["ui.notifications"],
-    approvedPermissions: ["ui.notifications"],
+test("rejects inconsistent API compatibility metadata", async () => {
+  await assert.rejects(createPluginCapabilityFacade(managedPlugin({
     compatibility: { compatible: true, pluginApiVersion: 0, hostApiVersion: 1 },
   }), {
     getApprovedPermissions: async () => new Set(["ui.notifications"]),
     notifications: () => undefined,
-  });
-  // The facade's authorization still requires explicit request and host grant;
-  // the plugin compatibility gate is handled by the manager's READY state.
-  assert.ok(facade.notifications);
+  }), CapabilityDeniedError);
 });
