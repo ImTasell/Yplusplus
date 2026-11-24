@@ -8,6 +8,28 @@ import { launchAppDir } from "./launcher.js";
 import { installAppImage } from "./managed.js";
 import { checkYapperUpdate, updateYapper } from "./updater.js";
 
+function usage(): never {
+  console.error(`Y++ BOOT 0.1.0
+
+Usage:
+  yplusplus inspect <extracted-appdir>
+  yplusplus patch <extracted-appdir>
+  yplusplus restore <extracted-appdir>
+  yplusplus launch <patched-appdir> [electron-args...]
+  yplusplus install <Yapper.AppImage>
+  yplusplus check-updates <managed-appdir>
+  yplusplus update <managed-appdir>
+  yplusplus plugins list
+  yplusplus plugins trust <plugin-id> <version>
+  yplusplus plugins untrust <plugin-id> <version>
+  yplusplus plugins untrust-all <plugin-id>
+  yplusplus plugins approve <plugin-id> <version> <capability...>
+  yplusplus plugins revoke <plugin-id> <version> [capability...]
+
+Plugin trust permits execution only; capability approval is a separate decision.
+`);
+  process.exit(2);
+}
 
 async function managePlugins(action: string | undefined, args: string[]): Promise<void> {
   const configuredDataHome = process.env.XDG_DATA_HOME;
@@ -24,7 +46,7 @@ async function managePlugins(action: string | undefined, args: string[]): Promis
   if (action === "list") {
     const report = await controller.inspect(discovery);
     for (const plugin of report.plugins) {
-      console.log(`${plugin.id}@${plugin.version}  ${plugin.state}  trusted=${plugin.trusted ? "yes" : "no"}  permissions=${plugin.approvedPermissions.join(",") || "none"}`);
+      console.log(`${plugin.id}@${plugin.version}  ${plugin.state}  trusted=${plugin.trusted ? "yes" : "no"}  capabilities=${plugin.approvedPermissions.join(",") || "none"}`);
     }
     for (const rejected of report.rejected) {
       console.warn(`Rejected ${rejected.directory}: ${rejected.issues.map((issue) => issue.code).join(", ")}`);
@@ -46,7 +68,7 @@ async function managePlugins(action: string | undefined, args: string[]): Promis
   switch (action) {
     case "trust":
       await controller.trust(plugin!);
-      console.log(`Trusted ${pluginId}@${pluginVersion}. Capability permissions were not granted.`);
+      console.log(`Trusted ${pluginId}@${pluginVersion}. No capabilities were granted.`);
       break;
     case "untrust":
       await controller.untrust(pluginId, pluginVersion!);
@@ -57,6 +79,7 @@ async function managePlugins(action: string | undefined, args: string[]): Promis
       console.log(`Revoked execution trust for every release of ${pluginId}.`);
       break;
     case "approve":
+      if (values.length === 0) throw new Error("Specify at least one requested capability to approve.");
       await controller.approve(plugin!, values);
       console.log(`Approved capabilities for ${pluginId}@${pluginVersion}: ${values.join(", ")}`);
       break;
@@ -68,42 +91,18 @@ async function managePlugins(action: string | undefined, args: string[]): Promis
       throw new Error("Unknown plugins action. Use list, trust, untrust, untrust-all, approve, or revoke.");
   }
 }
-\nfunction usage(): never {
-  console.error(`Y++ BOOT 0.1.0
 
-Usage:
-  yplusplus inspect <extracted-appdir>
-  yplusplus patch <extracted-appdir>
-  yplusplus restore <extracted-appdir>
-  yplusplus launch <patched-appdir> [electron-args...]
-  yplusplus install <Yapper.AppImage>
-  yplusplus check-updates <managed-appdir>
-  yplusplus update <managed-appdir>
-  yplusplus plugins list
-  yplusplus plugins trust <plugin-id> <version>
-  yplusplus plugins untrust <plugin-id> <version>
-  yplusplus plugins untrust-all <plugin-id>
-  yplusplus plugins approve <plugin-id> <version> <capability...>
-  yplusplus plugins revoke <plugin-id> <version> [capability...]
+async function main(): Promise<void> {
+  const [command, target] = process.argv.slice(2);
+  if (command === "plugins") {
+    await managePlugins(target, process.argv.slice(4));
+    return;
+  }
+  if (!command || !target) usage();
 
-The AppDir must be extracted from the official Yapper Linux AppImage first.
-Y++ never modifies the original AppImage.
-The install command creates a versioned managed AppDir and desktop entry.
-Update checks use Yapper's official HTTPS feed; downloads require an explicit update command.
-`);
-  process.exit(2);
-}
+  const appDir = resolve(target);
+  if (!existsSync(appDir)) throw new Error(`Path does not exist: ${appDir}`);
 
-const [command, target] = process.argv.slice(2);
-if (!command || !target) usage();
-
-const appDir = resolve(target);
-if (!existsSync(appDir)) {
-  console.error(`Path does not exist: ${appDir}`);
-  process.exit(1);
-}
-
-try {
   switch (command) {
     case "inspect": {
       const result = inspectAppDir(appDir);
@@ -124,14 +123,12 @@ try {
       console.log(`  Original backup: ${result.backupPath}`);
       break;
     }
-    case "restore": {
+    case "restore":
       console.log(`Restored original archive: ${restoreAppDir(appDir)}`);
       break;
-    }
-    case "launch": {
+    case "launch":
       launchAppDir(appDir, process.argv.slice(4));
       break;
-    }
     case "install": {
       const result = installAppImage(appDir);
       console.log("Y++ managed install: " + result.status);
@@ -149,9 +146,7 @@ try {
       console.log("  Update available: " + (result.available ? "yes" : "no"));
       console.log("  Supported by this Y++ build: " + (result.compatible ? "yes" : "no"));
       console.log("  Manifest: " + result.manifestUrl);
-      if (result.available && !result.compatible) {
-        console.warn("  Y++ will not download or install this version until its patch is verified.");
-      }
+      if (result.available && !result.compatible) console.warn("  Y++ will not download or install this version until its patch is verified.");
       break;
     }
     case "update": {
@@ -169,9 +164,10 @@ try {
     default:
       usage();
   }
-} catch (error) {
+}
+
+void main().catch((error: unknown) => {
   console.error("Y++ BOOT failed safely:");
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
-}
-\n}\n
+});
