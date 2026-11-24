@@ -41,7 +41,7 @@ function handle() {
 
 class TestPort implements RpcMessagePort {
   closed = false;
-  #listener?: (event: { readonly data: unknown }) => void;
+  #listener: ((event: { readonly data: unknown }) => void) | undefined;
   postMessage(_message: unknown): void {}
   addEventListener(_type: "message", listener: (event: { readonly data: unknown }) => void): void { this.#listener = listener; }
   removeEventListener(_type: "message", listener: (event: { readonly data: unknown }) => void): void {
