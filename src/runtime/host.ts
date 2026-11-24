@@ -135,6 +135,10 @@ export class PluginRuntimeHost {
         }, this.#startupTimeoutMs);
       });
       const handle = await Promise.race([startup, timedOut]);
+      if (record.state !== "INITIALIZING") {
+        await handle.terminate();
+        throw new Error("Plugin runtime stopped during initialization.");
+      }
       record.handle = handle;
       record.unsubscribeExit = handle.onExit(() => {
         if (record.state === "ACTIVE" || record.state === "INITIALIZING") {
