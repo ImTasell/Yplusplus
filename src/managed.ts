@@ -26,7 +26,15 @@ const RUNTIME_FILES = [
   "patcher.js",
   "asar.js",
   "preload-source.js",
-  "updater.js"
+  "updater.js",
+  "runtime/plugin-manager-service.js",
+  "runtime/plugin-manager-window.js",
+  "runtime/assets/plugin-manager.html",
+  "runtime/assets/plugin-manager.css",
+  "runtime/assets/plugin-manager-renderer.js",
+  "runtime/assets/plugin-manager-preload.cjs",
+  "runtime/assets/plugin-preload.cjs",
+  "runtime/assets/plugin-host.html"
 ] as const;
 
 export interface ManagedInstallOptions {
@@ -75,6 +83,7 @@ function escapeDesktopValue(value: string): string {
 
 export function renderDesktopEntry(nodeExecutable: string, cliPath: string, appDir: string): string {
   const exec = [nodeExecutable, cliPath, "launch", appDir].map(quoteDesktopArg).join(" ");
+  const managerExec = [nodeExecutable, cliPath, "launch", appDir, "--yplusplus-plugin-manager"].map(quoteDesktopArg).join(" ");
   return [
     "[Desktop Entry]",
     "Type=Application",
@@ -89,6 +98,12 @@ export function renderDesktopEntry(nodeExecutable: string, cliPath: string, appD
     "DBusActivatable=false",
     "Categories=Network;InstantMessaging;",
     "StartupWMClass=Yapin",
+    "Actions=PluginManager;",
+    "",
+    "[Desktop Action PluginManager]",
+    "Name=Plugin Manager",
+    "Comment=Manage Y++ plugins and permissions",
+    `Exec=${managerExec}`,
     ""
   ].join("\n");
 }
