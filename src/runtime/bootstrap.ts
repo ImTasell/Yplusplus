@@ -9,7 +9,11 @@ import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { PluginApprovalController } from "../plugins/approval-controller.js";
 import { discoverPlugins } from "../plugins/discovery.js";
-import { createElectronPluginRuntimeHost, isElectronSandboxDisabled } from "./electron-host.js";
+import {
+  createElectronPluginRuntimeHost,
+  isElectronSandboxDisabled,
+  type ElectronPluginRuntimeHostOptions,
+} from "./electron-host.js";
 
 export interface YplusplusElectronApp {
   readonly commandLine: { hasSwitch(name: string): boolean };
@@ -20,10 +24,10 @@ export interface YplusplusElectronApp {
 
 export interface YplusplusElectronDependencies {
   readonly app: YplusplusElectronApp;
-  readonly BrowserWindow: ConstructorParameters<typeof createElectronPluginRuntimeHost>[0]["BrowserWindow"];
-  readonly ipcMain: ConstructorParameters<typeof createElectronPluginRuntimeHost>[0]["ipcMain"];
-  readonly MessageChannelMain: ConstructorParameters<typeof createElectronPluginRuntimeHost>[0]["MessageChannelMain"];
-  readonly Notification: ConstructorParameters<typeof createElectronPluginRuntimeHost>[0]["Notification"];
+  readonly BrowserWindow: ElectronPluginRuntimeHostOptions["BrowserWindow"];
+  readonly ipcMain: ElectronPluginRuntimeHostOptions["ipcMain"];
+  readonly MessageChannelMain: ElectronPluginRuntimeHostOptions["MessageChannelMain"];
+  readonly Notification: ElectronPluginRuntimeHostOptions["Notification"];
 }
 
 export interface YplusplusBootstrapResult {
