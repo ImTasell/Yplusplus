@@ -120,13 +120,17 @@ function isInside(root: string, candidate: string): boolean {
 
 /** Re-read and revalidate the manifest and entry immediately before execution. */
 export async function readPluginEntry(
-  plugin: Pick<ManagedPlugin, "id" | "name" | "version" | "directory">,
+  plugin: Pick<ManagedPlugin, "id" | "name" | "version" | "directory" | "requestedPermissions" | "compatibility" | "entry">,
   maxEntryBytes = MAX_ENTRY_BYTES_DEFAULT,
 ): Promise<string> {
   if (!Number.isSafeInteger(maxEntryBytes) || maxEntryBytes < 1 || maxEntryBytes > 16 * 1024 * 1024) {
     throw new RangeError("maxEntryBytes must be an integer from 1 to 16777216.");
   }
 
+  const directoryInfo = await lstat(plugin.directory);
+  if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) {
+    throw new Error("Plugin directory must remain a regular, non-symlink directory.");
+  }
   const root = await realpath(plugin.directory);
   const manifestPath = path.join(root, PLUGIN_MANIFEST_FILE);
   const manifestInfo = await lstat(manifestPath);
@@ -144,8 +148,12 @@ export async function readPluginEntry(
   if (!validation.ok) throw new Error("Plugin manifest failed validation.");
 
   const manifest = validation.manifest;
-  if (manifest.id !== plugin.id || manifest.name !== plugin.name || manifest.version !== plugin.version) {
-    throw new Error("Plugin metadata changed after discovery; inspect it again before execution.");
+  const permissionsMatch = manifest.permissions.length === plugin.requestedPermissions.length &&
+    manifest.permissions.every((permission, index) => permission === plugin.requestedPermissions[index]);
+  if (manifest.id !== plugin.id || manifest.name !== plugin.name || manifest.version !== plugin.version ||
+      manifest.apiVersion !== plugin.compatibility.pluginApiVersion ||
+      !permissionsMatch || (plugin.entry !== undefined && manifest.entry !== plugin.entry)) {
+    throw new Error("Plugin manifest changed after discovery; inspect it again before execution.");
   }
 
   const entryPath = path.resolve(root, ...manifest.entry.split("/"));
