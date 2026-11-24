@@ -110,4 +110,4 @@ Run a patched extracted AppDir in a graphical Linux session and confirm:
 
 ## Current implementation status
 
-The initial source implementation is committed. The patcher currently targets the verified Yapper 1.2.7 archive structure and writes a separate `yplusplus-preload.cjs` ASAR entry. Automated unit tests and a CI type-check/build are being brought online before attempting a live graphical launch.
+The initial source implementation is committed. The patcher currently targets the verified Yapper 1.2.7 archive structure and writes a separate `yplusplus-preload.cjs` ASAR entry. Automated unit tests, type-check, and build now pass in CI. The real AppImage archive is undergoing a one-time patch/restore integration check before attempting a live graphical launch.
