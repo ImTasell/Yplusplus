@@ -48,7 +48,7 @@ function makeRegistrationSnippet(): string {
     "    const runtimeEntry = process.env.YPLUSPLUS_RUNTIME_ENTRY;",
     "    if (runtimeEntry) {",
     "      import(require('node:url').pathToFileURL(runtimeEntry).href)",
-    "        .then((runtime) => runtime.startYplusplusMain({ app, BrowserWindow, ipcMain, MessageChannelMain: require('electron').MessageChannelMain, Notification }))",
+    "        .then((runtime) => { const electron = require('electron'); return runtime.startYplusplusMain({ app: electron.app, BrowserWindow: electron.BrowserWindow, ipcMain: electron.ipcMain, MessageChannelMain: electron.MessageChannelMain, Notification: electron.Notification }); })",
     "        .catch((error) => console.error('[Y++] Main-process integration failed safely:', error));",
     "    } else {",
     "      console.warn('[Y++] Managed runtime path is not configured; plugin runtime is disabled.');",
