@@ -11,14 +11,14 @@ import {
 
 test("declares the complete lifecycle state set including READY", () => {
   assert.deepEqual(PLUGIN_STATES, [
-    "DISCOVERED", "VALIDATING", "WAITING_FOR_APPROVAL", "READY",
+    "DISCOVERED", "VALIDATING", "WAITING_FOR_TRUST", "WAITING_FOR_APPROVAL", "READY",
     "INITIALIZING", "ACTIVE", "SUSPENDED", "FAILED", "UNLOADING", "UNLOADED",
   ]);
 });
 
 test("allows successful activation with and without an approval wait", () => {
   const paths: PluginState[][] = [
-    ["DISCOVERED", "VALIDATING", "WAITING_FOR_APPROVAL", "READY", "INITIALIZING", "ACTIVE"],
+    ["DISCOVERED", "VALIDATING", "WAITING_FOR_TRUST", "WAITING_FOR_APPROVAL", "READY", "INITIALIZING", "ACTIVE"],
     ["DISCOVERED", "VALIDATING", "READY", "INITIALIZING", "ACTIVE"],
   ];
   for (const path of paths) {
@@ -32,7 +32,7 @@ test("allows successful activation with and without an approval wait", () => {
 
 test("allows failure from pre-active and active states", () => {
   for (const state of [
-    "DISCOVERED", "VALIDATING", "WAITING_FOR_APPROVAL", "READY",
+    "DISCOVERED", "VALIDATING", "WAITING_FOR_TRUST", "WAITING_FOR_APPROVAL", "READY",
     "INITIALIZING", "ACTIVE", "SUSPENDED",
   ] as const) assert.equal(canTransitionPluginState(state, "FAILED"), true);
   assert.equal(canTransitionPluginState("FAILED", "UNLOADING"), true);
