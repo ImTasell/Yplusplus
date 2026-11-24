@@ -1,6 +1,7 @@
 name: Y++ BOOT checks
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -8,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   checks:
@@ -21,7 +23,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
