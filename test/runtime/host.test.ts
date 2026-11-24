@@ -12,7 +12,7 @@ function plugin(overrides: Partial<ManagedPlugin> = {}): ManagedPlugin {
     name: "Runtime fixture",
     version: "1.0.0",
     directory: "/plugins/runtime",
-    state: "READY",
+    state: "READY",\n    trusted: true,
     requestedPermissions: [],
     approvedPermissions: [],
     deniedPermissions: [],
@@ -80,7 +80,7 @@ test("starts only READY plugins and transitions them to ACTIVE", async () => {
 
 test("rejects plugins that are not READY or compatible", async () => {
   const { runtime } = setup(async () => handle().value);
-  await assert.rejects(runtime.start(plugin({ state: "WAITING_FOR_APPROVAL" })), /READY/);
+  await assert.rejects(runtime.start(plugin({ state: "WAITING_FOR_APPROVAL" })), /READY/);\n  await assert.rejects(runtime.start(plugin({ trusted: false })), /READY/);
   await assert.rejects(runtime.start(plugin({
     compatibility: { compatible: false } as ManagedPlugin["compatibility"],
   })), /READY/);
