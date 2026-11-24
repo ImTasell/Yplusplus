@@ -75,25 +75,33 @@ cd /tmp/yapper-extract
 Inspect and patch the extracted AppDir:
 
 ```bash
-node --experimental-strip-types src/cli.ts inspect /tmp/yapper-extract/squashfs-root
-node --experimental-strip-types src/cli.ts patch /tmp/yapper-extract/squashfs-root
+npm run inspect -- /tmp/yapper-extract/squashfs-root
+npm run patch -- /tmp/yapper-extract/squashfs-root
 ```
 
 Restore the original ASAR:
 
 ```bash
-node --experimental-strip-types src/cli.ts restore /tmp/yapper-extract/squashfs-root
+npm run restore -- /tmp/yapper-extract/squashfs-root
 ```
 
-**The original AppImage is never modified.** The current CLI only operates on an extracted AppDir. It does not yet build a replacement AppImage or install a desktop launcher.
+**The original AppImage is never modified.** The CLI operates on an extracted AppDir. It does not yet build a replacement AppImage or install a desktop launcher.
+
+Launch a patched AppDir through Y++ rather than running its `AppRun` script:
+
+```bash
+npm run launch -- /tmp/yapper-extract/squashfs-root
+```
+
+Y++ starts the Electron binary directly and recreates the AppRun library environment. It intentionally removes `APPIMAGE` from the child environment. The packaged `electron-updater` uses `APPIMAGE` as the path it unlinks and replaces during an update; AppRun sets that variable to itself when running an extracted AppDir. Leaving it unset prevents Yapper's updater from replacing the AppRun script or bypassing Y++ with an unpatched restart. As a consequence, Yapper's built-in AppImage updater is inactive under this launcher. Y++ must implement version detection, download, extraction, patching, and relaunch before automatic updates can be restored.
 
 A one-time GitHub Actions integration run extracted the captured official 1.2.7 AppImage, inspected its real ASAR, patched it successfully, verified the patch marker, restored the backup, and compared the restored archive byte-for-byte with the original. The temporary integration job was removed after that check.
 
 ## Known limitations
 
 - The real AppImage archive patch/restore path and ASAR integrity metadata have been verified in GitHub Actions; this does not yet prove the preload executes inside a live Yapper window.
-- The preload script must be bundled as a sandbox-compatible single file. The current emitted source is self-contained.
-- AppImage updater behavior has not been validated. Do not use this patched AppDir as a daily driver until update behavior and rollback are tested.
+- The preload script is a self-contained sandbox-compatible CommonJS file.
+- Live graphical preload execution has not yet been validated.
 - A successful patch is not a guarantee of compatibility with any Yapper version other than 1.2.7.
 - The session registration API does not rerun for in-page navigations; the preload is injected for each matching document navigation.
 - The Y++ API is not a plugin security sandbox. Plugin execution and capability brokering are future milestones.
