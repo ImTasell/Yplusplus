@@ -125,3 +125,5 @@ The initial source implementation is committed. The patcher currently targets th
 
 The next verification is a one-time headless Electron launch under Xvfb, using Chromium DevTools Protocol to inspect the live renderer and confirm both `window.yplusplus` and the original `window.yapperDesktop` bridge coexist.
 
+
+The live-launch probe initially exposed a CLI dispatch omission (the launcher command was not wired into the command switch); that has been fixed before the next live run.
