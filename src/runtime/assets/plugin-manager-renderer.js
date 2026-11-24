@@ -47,7 +47,9 @@ function renderPlugin(plugin) {
   names.append(element("h2", "", plugin.name));
   names.append(element("div", "plugin-id", plugin.id));
   identity.append(names);
-  const status = element("span", "state " + String(plugin.state).toLowerCase(), plugin.runtimeState === "ACTIVE" ? "ACTIVE" : plugin.state.replaceAll("_", " "));
+  const runtimeActive = plugin.runtimeState === "ACTIVE";
+  const statusText = runtimeActive ? "ACTIVE" : plugin.state.replaceAll("_", " ");
+  const status = element("span", "state " + String(runtimeActive ? "active" : plugin.state).toLowerCase(), statusText);
   head.append(identity, status);
   card.append(head, element("p", "plugin-desc", "Version " + plugin.version + " · API " + plugin.compatibility.pluginApiVersion));
 
@@ -58,11 +60,11 @@ function renderPlugin(plugin) {
     permissionList.append(element("div", "permission", "This plugin requests no capabilities."));
   }
   for (const capability of plugin.requestedPermissions) {
-    const row = element("div", "permission");
-    const name = element("span", "permission-name", capability);
+    const denied = plugin.deniedPermissions.find((item) => item.id === capability);
     const approved = plugin.approvedPermissions.includes(capability);
-    const state = element("span", "permission-state", approved ? "Approved" : "Not approved");
-    row.append(name, state);
+    const stateText = approved ? "Approved" : denied?.reason === "unsupported" ? "Unsupported by host" : "Not approved";
+    const row = element("div", "permission");
+    row.append(element("span", "permission-name", capability), element("span", "permission-state", stateText));
     permissionList.append(row);
   }
   permissionArea.append(permissionList);
@@ -81,8 +83,10 @@ function renderPlugin(plugin) {
   if (plugin.approvedPermissions.length) {
     actions.append(button("Revoke all capabilities", () => perform(() => api.revoke(plugin.id, plugin.version)), "danger"));
   }
-  if (plugin.runtimeState === "ACTIVE") {
+  if (runtimeActive) {
     actions.append(button("Stop plugin", () => perform(() => api.unload(plugin.id, plugin.version))));
+  } else if (plugin.state === "READY" && plugin.trusted) {
+    actions.append(button("Start plugin", () => perform(() => api.start(plugin.id, plugin.version)), "primary"));
   }
   card.append(actions);
   if (plugin.issue) card.append(element("p", "plugin-desc", plugin.issue.message));
@@ -106,7 +110,5 @@ async function refresh() {
   }
 }
 
-document.getElementById("refresh").addEventListener("click", () => {
-  perform(async () => {});
-});
+document.getElementById("refresh").addEventListener("click", () => perform(async () => {}));
 refresh().catch((error) => { notice.textContent = error.message || String(error); });
