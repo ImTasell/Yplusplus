@@ -84,7 +84,7 @@ No capability is implemented or granted by this RFC. Unknown capability identifi
 
 Authorization is checked again on every call, so revoking a grant blocks subsequent calls without relying on a stale manager snapshot. Notification payloads are normalized and bounded (title 1–80 characters, message 1–500); extra keys, missing values, and accessor properties are rejected. The broker receives a trusted notification adapter from the host and does not import Electron or expose Node APIs.
 
-The broker is connected to the RPC foundation and re-checks approval on every operation. `src/runtime/electron-host.ts` now wires the broker to Electron's native Notification API, MessageChannelMain, the sandboxed renderer adapter, and the runtime coordinator. The remaining integration task is to construct this host from Yapper's actual main process and connect it to plugin discovery/approval UI.
+The broker is connected to the RPC foundation and re-checks approval on every operation. `src/runtime/electron-host.ts` now wires the broker to Electron's native Notification API, MessageChannelMain, the sandboxed renderer adapter, and the runtime coordinator. The Yapper 1.2.7 BOOT patch now dynamically imports the managed `src/runtime/bootstrap.js` entry when `YPLUSPLUS_RUNTIME_ENTRY` is set. The bootstrap discovers plugins under the managed XDG data directory (or an absolute `YPLUSPLUS_PLUGIN_DIR` override), loads the persistent approval controller, starts only plugins already in READY, and unloads active runtimes before allowing Yapper to quit. Plugins waiting for approval remain stopped; there is not yet a user-facing approval UI.
 
 ### Persistent approval store
 
@@ -155,7 +155,7 @@ The dedicated preload at `src/runtime/assets/plugin-preload.cjs` receives the tr
 
 **Important sandbox caveat:** if the parent Yapper process was launched with `--no-sandbox`, Chromium's global sandbox is disabled. In that state the adapter refuses to start third-party plugins even though the window requests `sandbox: true`. The host must not lie in `isSandboxDisabled()`. This is particularly relevant to the existing BOOT launcher fallback, which may add `--no-sandbox` when user namespaces are unavailable. The adapter is execution plumbing, not a promise that every host launch can safely run plugins.
 
-`src/runtime/electron-host.ts` provides `createElectronPluginRuntimeHost()`, which connects the sandbox adapter, MessageChannelMain, persistent approval provider, RPC broker, and native Electron Notification constructor. `PluginRuntimeHost` now permits asynchronous session creation and bounds that setup with its startup timeout. The factory is still not invoked by Yapper's live main process; a real Electron/Yapper integration test and app lifecycle wiring remain necessary.
+`src/runtime/electron-host.ts` provides `createElectronPluginRuntimeHost()`, which connects the sandbox adapter, MessageChannelMain, persistent approval provider, RPC broker, and native Electron Notification constructor. `src/runtime/bootstrap.ts` now invokes this factory from the patched Yapper main process, performs plugin discovery/inspection, starts READY plugins, and handles orderly shutdown. `PluginRuntimeHost` permits asynchronous session creation and bounds that setup with its startup timeout. This is source-level integration; a real Electron/Yapper runtime test is still required.
 
 ### Plugin-side API client and end-to-end RPC
 
@@ -196,7 +196,7 @@ The transport and client now form a tested end-to-end RPC/capability path. They 
 
 ## Planned package boundaries
 
-- Yapper main-process integration: instantiate the runtime host, discover installed plugins, and manage startup/shutdown.
+- User-facing plugin approval and management UI, plus real Electron/Yapper integration tests.
 - Plugin installation, user-facing approval/management UI, developer tooling, diagnostics, and real Electron integration tests.
 
 These are conceptual boundaries, not a promise that every planned module exists today.
@@ -210,7 +210,7 @@ These are conceptual boundaries, not a promise that every planned module exists 
 5. Plugin API compatibility policy. (Implemented.)
 6. Plugin manager inspection/orchestration through READY. (Implemented; approval provider is injected.)
 7. Persistent approval storage and host approval/revocation workflow. (Implemented; UI remains.)
-8. Sandboxed execution adapter and narrow RPC (protocol, session dispatcher, plugin client, MessagePort transport, Electron MessagePortMain adapter, runtime coordinator, sandboxed BrowserWindow adapter, and native notification host factory implemented; live Yapper main-process wiring remains).
+8. Sandboxed execution adapter and narrow RPC (protocol, session dispatcher, plugin client, MessagePort transport, Electron MessagePortMain adapter, runtime coordinator, sandboxed BrowserWindow adapter, native notification host factory, and BOOT main-process bootstrap implemented; real Electron/Yapper validation remains).
 9. Developer tooling, diagnostics, and UI. (The example entry can be executed by the Electron host factory; automatic plugin installation, user-facing approval, and management UI remain.)
 
-The current Y++ BOOT patcher and preload remain independent of this plugin subsystem. Plugin work must not destabilize the verified Yapper 1.2.7 integration.
+The Y++ BOOT patcher now has a version-specific main-process hook for the managed plugin runtime, while the renderer preload remains a separate bridge. Keep the plugin bootstrap fail-closed and validate against the actual Yapper 1.2.7 AppImage before treating live integration as verified.
