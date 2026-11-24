@@ -143,13 +143,21 @@ The exact worker technology is intentionally deferred until the manifest and lif
 
 The transport adapter in `src/runtime/message-port.ts` now binds a `PluginRpcSession` to a standard MessagePort-like endpoint. It starts the port, dispatches each received message through that session, posts the bounded RPC response, and suppresses late replies after transport closure. The adapter accepts no plugin identity; the host must create the port pair and bind the session using trusted discovery/approval state before handing the other endpoint to a plugin runtime.
 
+### Plugin-side API client and end-to-end RPC
+
+`src/runtime/client.ts` provides the plugin-facing `createPluginApiClient(port)` API. It exposes only `notifications.show({ title, message })`, uses generated request IDs, bounds pending calls, applies per-call timeouts, maps host errors to `PluginApiError`, and rejects outstanding calls when the client closes. It has no Node or Electron imports and is intended to be bundled into the sandbox renderer. The host still validates every request and rechecks persistent approval through the capability broker.
+
+`test/runtime/integration.test.ts` exercises the complete in-process path: plugin API client → MessagePort → host RPC session → capability broker → trusted notification adapter. It also verifies that revoking approval blocks subsequent calls without reconnecting. This proves the RPC/capability path, not the Electron sandbox or a real desktop notification.
+
+A minimal example manifest and entry live in `examples/notification-plugin/`. The entry expects the future sandbox adapter to install the frozen `globalThis.yplusplus` API before calling its exported `activate()` function. It is an API example, not yet a loadable/installable plugin until the Electron execution adapter and entry loader land.
+
 ### Runtime host coordinator
 
 `src/runtime/host.ts` coordinates one runtime instance per plugin ID. It accepts only compatible plugins in READY, creates a channel and capability-backed RPC session through host-injected factories, transfers the plugin endpoint to an injected execution adapter, and marks the plugin ACTIVE only after adapter startup resolves. Startup is bounded by a configurable timeout; failures and unexpected exits move the runtime to FAILED, close both channel endpoints, and terminate the execution handle. Explicit unload revokes the channel and terminates the worker before reaching UNLOADED. A failed instance may be unloaded and then started again as a fresh instance.
 
 The execution adapter is deliberately injected: the coordinator does not silently choose Node `worker_threads` as a sandbox. Node workers have access to Node APIs and are **not** a security boundary for hostile third-party code. A production adapter must use an execution environment with an explicit security model (for example, a sandboxed Electron renderer with Node integration disabled and context isolation enabled), and must transfer only the plugin-side MessagePort. This coordinator is lifecycle/fault-containment plumbing, not proof of sandboxing.
 
-This is a MessagePort transport foundation, not yet a complete sandbox. It does not create a Worker, choose an isolation policy, authenticate an arbitrary caller, or execute plugin code. The host must keep the host-side port private, bind exactly one session to each plugin endpoint, and never accept an identity supplied in the RPC payload.
+The transport and client now form a tested end-to-end RPC/capability path. They still do not create an Electron renderer, choose an isolation policy, authenticate an arbitrary caller outside host-owned construction, or execute plugin code. The host must keep the host-side port private, bind exactly one session to each plugin endpoint, and never accept an identity supplied in the RPC payload.
 
 ## Implemented package boundaries
 
@@ -163,11 +171,11 @@ This is a MessagePort transport foundation, not yet a complete sandbox. It does 
 - `src/capabilities/broker.ts`: least-privilege notification facade with per-call approval checks and bounded payload validation.
 - `src/capabilities/approval-store.ts`: persistent, version-scoped approval decisions with fail-closed validation and revocation.
 - `src/runtime/protocol.ts`: strict, bounded, versioned RPC envelopes and payload parsing.
-- `src/runtime/rpc-session.ts`: host dispatcher with concurrency limits, timeouts, and duplicate-request protection.\n- `src/runtime/message-port.ts`: MessagePort transport adapter for one host-bound RPC session.\n- `src/runtime/host.ts`: host-side runtime coordinator for startup, activation, crash handling, and unload.
+- `src/runtime/rpc-session.ts`: host dispatcher with concurrency limits, timeouts, and duplicate-request protection.\n- `src/runtime/message-port.ts`: MessagePort transport adapter for one host-bound RPC session.\n- `src/runtime/host.ts`: host-side runtime coordinator for startup, activation, crash handling, and unload.\n- `src/runtime/client.ts`: plugin-side narrow capability API client.
 
 ## Planned package boundaries
 
-- `src/runtime/`: production sandboxed execution adapter, Electron integration, and session lifecycle wiring (the coordinator and MessagePort adapter are implemented).
+- `src/runtime/`: production sandboxed Electron execution adapter, renderer bootstrap/entry loader, and session lifecycle wiring (coordinator, MessagePort transport, and plugin-side client are implemented).
 - A concrete Electron notification adapter and host UI integration.
 - Developer tooling, sample plugin, diagnostics, and UI.
 
@@ -183,6 +191,6 @@ These are conceptual boundaries, not a promise that every planned module exists 
 6. Plugin manager inspection/orchestration through READY. (Implemented; approval provider is injected.)
 7. Persistent approval storage and host approval/revocation workflow. (Implemented; UI remains.)
 8. Sandboxed execution adapter and narrow RPC (protocol, session dispatcher, MessagePort transport, and host runtime coordinator implemented; production sandbox adapter remains).
-9. Developer tooling, sample plugin, diagnostics, and UI.
+9. Developer tooling, diagnostics, and UI. (A minimal API example exists; it is not loadable until the execution adapter lands.)
 
 The current Y++ BOOT patcher and preload remain independent of this plugin subsystem. Plugin work must not destabilize the verified Yapper 1.2.7 integration.
