@@ -2,13 +2,13 @@
  * Pure plugin lifecycle transition policy.
  *
  * This module does not execute plugin code or perform lifecycle side effects.
- * The manager will orchestrate those operations around this state machine.
+ * The manager orchestrates those operations around this state machine.
  */
-
 export const PLUGIN_STATES = [
   "DISCOVERED",
   "VALIDATING",
   "WAITING_FOR_APPROVAL",
+  "READY",
   "INITIALIZING",
   "ACTIVE",
   "SUSPENDED",
@@ -26,7 +26,6 @@ export interface InvalidTransition {
   readonly to: PluginState;
   readonly message: string;
 }
-
 export interface SuccessfulTransition {
   readonly ok: true;
   readonly from: PluginState;
@@ -36,8 +35,9 @@ export interface SuccessfulTransition {
 
 const TRANSITIONS: Readonly<Record<PluginState, readonly PluginState[]>> = {
   DISCOVERED: ["VALIDATING", "FAILED", "UNLOADING"],
-  VALIDATING: ["WAITING_FOR_APPROVAL", "INITIALIZING", "FAILED", "UNLOADING"],
-  WAITING_FOR_APPROVAL: ["INITIALIZING", "FAILED", "UNLOADING"],
+  VALIDATING: ["WAITING_FOR_APPROVAL", "READY", "FAILED", "UNLOADING"],
+  WAITING_FOR_APPROVAL: ["READY", "FAILED", "UNLOADING"],
+  READY: ["INITIALIZING", "FAILED", "UNLOADING"],
   INITIALIZING: ["ACTIVE", "FAILED", "UNLOADING"],
   ACTIVE: ["SUSPENDED", "FAILED", "UNLOADING"],
   SUSPENDED: ["ACTIVE", "FAILED", "UNLOADING"],
@@ -46,21 +46,12 @@ const TRANSITIONS: Readonly<Record<PluginState, readonly PluginState[]>> = {
   UNLOADED: [],
 };
 
-export function canTransitionPluginState(
-  from: PluginState,
-  to: PluginState,
-): boolean {
+export function canTransitionPluginState(from: PluginState, to: PluginState): boolean {
   return from === to || TRANSITIONS[from].includes(to);
 }
 
-/**
- * Apply one state transition without side effects.
- * Repeating the current state is an idempotent no-op.
- */
-export function transitionPluginState(
-  from: PluginState,
-  to: PluginState,
-): SuccessfulTransition | InvalidTransition {
+/** Apply one state transition without side effects. */
+export function transitionPluginState(from: PluginState, to: PluginState): SuccessfulTransition | InvalidTransition {
   if (!canTransitionPluginState(from, to)) {
     return {
       ok: false,
@@ -70,21 +61,13 @@ export function transitionPluginState(
       message: `Plugin lifecycle cannot transition from ${from} to ${to}.`,
     };
   }
-
-  return {
-    ok: true,
-    from,
-    to,
-    changed: from !== to,
-  };
+  return { ok: true, from, to, changed: from !== to };
 }
 
 export function isTerminalPluginState(state: PluginState): boolean {
   return state === "UNLOADED";
 }
 
-export function getAllowedPluginTransitions(
-  state: PluginState,
-): readonly PluginState[] {
+export function getAllowedPluginTransitions(state: PluginState): readonly PluginState[] {
   return TRANSITIONS[state];
 }
