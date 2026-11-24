@@ -269,3 +269,16 @@ test("host abort destroys a renderer that is waiting for its preload handshake",
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+
+test("entry reader rejects a changed manifest entry after discovery", async () => {
+  const directory = await makePluginDirectory();
+  try {
+    await assert.rejects(
+      readPluginEntry({ ...fixture(), directory, entry: "other.js" }),
+      /manifest changed after discovery/,
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
