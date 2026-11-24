@@ -1,0 +1,101 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { MessageChannel, type MessagePort } from "node:worker_threads";
+import { createPluginApiClient, PluginApiError } from "../../src/runtime/client.js";
+import type { RpcMessagePort } from "../../src/runtime/message-port.js";
+
+function port(value: MessagePort): RpcMessagePort {
+  return value as unknown as RpcMessagePort;
+}
+
+test("sends notification requests and resolves successful responses", async () => {
+  const channel = new MessageChannel();
+  const host = port(channel.port1);
+  const client = createPluginApiClient(port(channel.port2));
+  const received = new Promise<unknown>((resolve) => {
+    host.addEventListener("message", (event) => {
+      resolve(event.data);
+      const request = event.data as { requestId: string };
+      host.postMessage({
+        rpcVersion: 1, type: "response", requestId: request.requestId,
+        ok: true, result: null,
+      });
+    });
+    host.start();
+  });
+  const result = client.notifications.show({ title: "Hello", message: "From plugin" });
+  const message = await received as {
+    rpcVersion: number; type: string; method: string;
+    payload: { title: string; message: string };
+  };
+  assert.equal(message.rpcVersion, 1);
+  assert.equal(message.type, "request");
+  assert.equal(message.method, "capabilities.notifications.show");
+  assert.deepEqual(message.payload, { title: "Hello", message: "From plugin" });
+  await result;
+  client.close();
+  host.close();
+});
+
+test("maps host errors to PluginApiError", async () => {
+  const channel = new MessageChannel();
+  const host = port(channel.port1);
+  const client = createPluginApiClient(port(channel.port2));
+  host.addEventListener("message", (event) => {
+    const request = event.data as { requestId: string };
+    host.postMessage({
+      rpcVersion: 1, type: "response", requestId: request.requestId,
+      ok: false, error: { code: "CAPABILITY_DENIED", message: "Denied." },
+    });
+  });
+  host.start();
+  await assert.rejects(
+    client.notifications.show({ title: "No", message: "Permission" }),
+    (error: unknown) => error instanceof PluginApiError &&
+      error.code === "CAPABILITY_DENIED" && error.message === "Denied.",
+  );
+  client.close();
+  host.close();
+});
+
+test("rejects pending calls when the client closes", async () => {
+  const channel = new MessageChannel();
+  const client = createPluginApiClient(port(channel.port2));
+  const pending = client.notifications.show({ title: "Wait", message: "No host response" });
+  client.close();
+  await assert.rejects(pending, (error: unknown) =>
+    error instanceof PluginApiError && error.code === "SESSION_CLOSED");
+  channel.port1.close();
+});
+
+test("enforces pending request limits and argument validation", async () => {
+  const channel = new MessageChannel();
+  const client = createPluginApiClient(port(channel.port2), { maxPendingRequests: 1 });
+  const pending = client.notifications.show({ title: "One", message: "Pending" });
+  await assert.rejects(
+    client.notifications.show({ title: "Two", message: "Rejected" }),
+    (error: unknown) => error instanceof PluginApiError && error.code === "RATE_LIMITED",
+  );
+  await assert.rejects(
+    client.notifications.show({ title: 1, message: "Invalid" } as never),
+    (error: unknown) => error instanceof PluginApiError && error.code === "INVALID_ARGUMENT",
+  );
+  client.close();
+  await assert.rejects(pending);
+  channel.port1.close();
+});
+
+test("times out unanswered calls and validates client limits", async () => {
+  const channel = new MessageChannel();
+  const client = createPluginApiClient(port(channel.port2), { requestTimeoutMs: 50 });
+  await assert.rejects(
+    client.notifications.show({ title: "Timeout", message: "No reply" }),
+    (error: unknown) => error instanceof PluginApiError && error.code === "REQUEST_TIMEOUT",
+  );
+  client.close();
+  channel.port1.close();
+  const unused = new MessageChannel();
+  assert.throws(() => createPluginApiClient(port(unused.port2), { maxPendingRequests: 0 }), RangeError);
+  unused.port1.close();
+  unused.port2.close();
+});
