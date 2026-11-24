@@ -114,6 +114,26 @@ npm run launch -- /tmp/yapper-extract/squashfs-root
 
 Y++ starts the Electron binary directly and recreates the AppRun library environment. It intentionally removes `APPIMAGE` from the child environment. The packaged `electron-updater` uses `APPIMAGE` as the path it unlinks and replaces during an update; AppRun sets that variable to itself when running an extracted AppDir. Leaving it unset prevents Yapper's updater from replacing the AppRun script or bypassing Y++ with an unpatched restart. As a consequence, Yapper's built-in AppImage updater is inactive under this launcher. Y++ must implement version detection, download, extraction, patching, and relaunch before automatic updates can be restored.
 
+## Managed installation
+
+Build and install directly from the official AppImage:
+
+```bash
+npm run install-managed -- /path/to/Yapper-Setup.AppImage
+```
+
+The command builds the Y++ runtime, invokes the AppImage's own `--appimage-extract` mode, validates the extracted Yapper package/version, patches the ASAR, and moves the AppDir into a versioned managed location. It does not need root privileges and never edits or copies over the source AppImage.
+
+Default locations follow the XDG layout:
+
+- AppDir: `$XDG_DATA_HOME/yplusplus/versions/yapper-desktop-1.2.7` (defaults to `~/.local/share` when `XDG_DATA_HOME` is unset or invalid).
+- Self-contained Y++ Node runtime: `$XDG_DATA_HOME/yplusplus/runtime/0.1.0`.
+- Desktop entry: `$XDG_DATA_HOME/applications/yplusplus-yapper.desktop`.
+
+The desktop entry points to the copied Y++ runtime and the Node executable used during installation; it does not depend on the source Git checkout remaining in place. The launcher invokes the managed AppDir through Y++'s safe direct-Electron launch path. Reinstalling the same Yapper version reuses the existing managed AppDir instead of replacing it. Installing a different supported version creates a separate version directory and atomically updates the desktop entry to point to it; older versions are retained.
+
+The source AppImage remains wherever it was downloaded. Once installation succeeds, it can be archived or deleted independently of the managed AppDir. Unsupported Yapper versions, malformed AppDirs, incomplete managed runtimes, and existing targets without a Y++ backup are rejected rather than overwritten. The patcher currently supports **only Yapper 1.2.7**, so newer upstream releases remain fail-closed until their patch anchors are researched and added.
+
 One GitHub Actions integration run extracted the captured official 1.2.7 AppImage, inspected its real ASAR, patched it successfully, verified the patch marker, restored the backup, and compared the restored archive byte-for-byte with the original. A second headless Electron integration run launched the patched AppDir under Xvfb and queried the live renderer over Chromium DevTools Protocol. It confirmed `window.yplusplus` (`version: 0.1.0`, `ready: true`) and the original `window.yapperDesktop` were both present. The temporary integration job was removed after verification.
 
 ## Known limitations
