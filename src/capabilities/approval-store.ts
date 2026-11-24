@@ -11,6 +11,7 @@ import {
   rename,
   rm,
   writeFile,
+  chmod,
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -20,7 +21,7 @@ const STORE_VERSION = 1 as const;
 const PLUGIN_ID_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const CAPABILITY_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const SEMVER_PATTERN =
-  /^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$/;
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 
 interface ApprovalRecord {
   readonly pluginId: string;
@@ -203,7 +204,7 @@ export class PluginApprovalStore {
 
     const temporary = join(directory, `.permissions-${randomBytes(8).toString("hex")}.tmp`);
     try {
-      await writeFile(temporary, JSON.stringify(document, null, 2) + "\\n", {
+      await writeFile(temporary, JSON.stringify(document, null, 2) + "\n", {
         encoding: "utf8",
         flag: "wx",
         mode: 0o600,
@@ -221,10 +222,14 @@ export class PluginApprovalStore {
     const additions = validateCapabilities(capabilities);
     if (additions.length === 0) return;
     await this.mutate((records) => {
-      const existing = records.find((record) =>
+      const index = records.findIndex((record) =>
         record.pluginId === pluginId && record.pluginVersion === pluginVersion);
-      if (existing) {
-        existing.capabilities = [...new Set([...existing.capabilities, ...additions])].sort();
+      if (index >= 0) {
+        const existing = records[index]!;
+        records[index] = {
+          ...existing,
+          capabilities: [...new Set([...existing.capabilities, ...additions])].sort(),
+        };
       } else {
         records.push({ pluginId, pluginVersion, capabilities: additions });
       }
@@ -258,6 +263,5 @@ export class PluginApprovalStore {
 }
 
 async function chmodDirectory(directory: string): Promise<void> {
-  const { chmod } = await import("node:fs/promises");
   await chmod(directory, 0o700);
 }
