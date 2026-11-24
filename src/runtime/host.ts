@@ -34,7 +34,7 @@ export interface PluginExecutionAdapter {
 
 export interface PluginRuntimeOptions {
   readonly createChannel: () => PluginMessageChannel;
-  readonly createSession: (plugin: ManagedPlugin) => PluginRpcSession;
+  readonly createSession: (plugin: ManagedPlugin) => PluginRpcSession | Promise<PluginRpcSession>;
   readonly execution: PluginExecutionAdapter;
   readonly startupTimeoutMs?: number;
 }
@@ -107,7 +107,17 @@ export class PluginRuntimeHost {
     const channel = this.#options.createChannel();
     let transport: RpcPortTransport;
     try {
-      const session = this.#options.createSession(plugin);
+      let sessionTimeout: ReturnType<typeof setTimeout> | undefined;
+      const sessionPromise = Promise.resolve(this.#options.createSession(plugin));
+      const sessionTimedOut = new Promise<never>((_, reject) => {
+        sessionTimeout = setTimeout(() => reject(new Error("Plugin session setup timed out.")), this.#startupTimeoutMs);
+      });
+      let session: PluginRpcSession;
+      try {
+        session = await Promise.race([sessionPromise, sessionTimedOut]);
+      } finally {
+        if (sessionTimeout !== undefined) clearTimeout(sessionTimeout);
+      }
       transport = bindRpcMessagePort(channel.hostPort, session);
     } catch (error) {
       channel.hostPort.close();
