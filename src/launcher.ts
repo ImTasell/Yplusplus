@@ -16,7 +16,7 @@ export function buildLaunchEnvironment(appDir: string, inherited: NodeJS.Process
   env.APPDIR = root;
   const paths = managedPaths(inherited);
   const runtimeDir = join(paths.runtimeParent, YPLUSPLUS_RUNTIME_VERSION);
-  env.YPLUSPLUS_RUNTIME_ENTRY = join(runtimeDir, "src", "runtime", "bootstrap.js");
+  env.YPLUSPLUS_RUNTIME_ENTRY = join(runtimeDir, "runtime", "bootstrap.js");
   env.YPLUSPLUS_PLUGIN_DIR = join(paths.managedRoot, "plugins");
   env.PATH = [root, join(root, "usr", "sbin"), inherited.PATH].filter(Boolean).join(delimiter);
   env.XDG_DATA_DIRS = [
