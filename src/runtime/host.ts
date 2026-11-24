@@ -28,7 +28,7 @@ export interface PluginExecutionAdapter {
    * Start the plugin and resolve only after its entry has initialized.
    * The adapter must transfer pluginPort into the isolated context.
    */
-  start(plugin: Pick<ManagedPlugin, "id" | "name" | "version" | "directory" | "requestedPermissions" | "compatibility" | "entry">,
+  start(plugin: Pick<ManagedPlugin, "id" | "name" | "version" | "directory" | "requestedPermissions" | "compatibility" | "entry"> & { readonly trusted: true },
     pluginPort: RpcMessagePort, signal?: AbortSignal): Promise<PluginExecutionHandle>;
 }
 
@@ -95,7 +95,7 @@ export class PluginRuntimeHost {
 
   async start(plugin: ManagedPlugin): Promise<PluginRuntimeSnapshot> {
     if (plugin.state !== "READY" || plugin.trusted !== true || !plugin.compatibility.compatible) {
-      throw new Error("Only compatible READY plugins may be started.");
+      throw new Error("Only explicitly trusted, compatible READY plugins may be started.");
     }
     const existing = this.#records.get(plugin.id);
     if (existing && existing.state !== "UNLOADED" && existing.state !== "FAILED") {
