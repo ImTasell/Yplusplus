@@ -39,6 +39,14 @@ The preload has two additional checks: HTTPS plus the exact Yapper/Yapin host al
 
 It does not expose Node.js, `ipcRenderer`, filesystem access, or privileged operations.
 
+### Origin-isolation regression coverage
+
+The preload registration uses four exact HTTPS host patterns; it does not use a wildcard subdomain pattern. The preload independently checks the parsed document URL against the same four-host allowlist and refuses to expose the API unless `process.isMainFrame` is true. This means third-party OAuth pages (for example Google, Discord, GitHub, and Microsoft sign-in origins), lookalike domains, plain HTTP pages, and child frames are denied by the preload guard.
+
+The automated tests execute the actual generated preload source in an isolated JavaScript VM with a mocked Electron `contextBridge`. They cover all four allowed origins, external sign-in hosts, lookalike hosts, HTTP, non-web/malformed URLs, and child frames. A separate patcher test asserts that the injected Electron URL filters remain the four exact host patterns and do not become wildcard subdomain filters.
+
+**Scope note:** these are deterministic policy/regression tests, not a claim that every possible Yapper OAuth popup flow has been exercised in a live desktop session. The previous live Electron test verified the bridge and original Yapper bridge coexist in the main renderer. Live popup/navigation verification remains part of desktop smoke testing.
+
 ## Why the patcher edits the ASAR header
 
 The patcher uses a small ASAR reader/writer implemented with Node built-ins. It appends the replacement main-process source and new preload to the archive's data section, then updates only their offsets, sizes, and SHA-256 integrity metadata. Existing file payloads—including the original preload and the unpacked native dependency directory—are left in place.
