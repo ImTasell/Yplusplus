@@ -106,3 +106,8 @@ Run a patched extracted AppDir in a graphical Linux session and confirm:
 4. `window.yplusplus.getStatus()` reports ready.
 5. External popups and non-Yapper pages do not receive the Y++ bridge.
 6. Restoring the backup returns the original archive byte-for-byte.
+
+
+## Current implementation status
+
+The initial source implementation is committed. The patcher currently targets the verified Yapper 1.2.7 archive structure and writes a separate `yplusplus-preload.cjs` ASAR entry. Automated unit tests and a CI type-check/build are being brought online before attempting a live graphical launch.
