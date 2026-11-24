@@ -28,7 +28,7 @@ export interface PluginExecutionAdapter {
    * Start the plugin and resolve only after its entry has initialized.
    * The adapter must transfer pluginPort into the isolated context.
    */
-  start(plugin: Pick<ManagedPlugin, "id" | "name" | "version" | "directory">,
+  start(plugin: Pick<ManagedPlugin, "id" | "name" | "version" | "directory" | "requestedPermissions" | "compatibility" | "entry">,
     pluginPort: RpcMessagePort, signal?: AbortSignal): Promise<PluginExecutionHandle>;
 }
 
@@ -145,6 +145,9 @@ export class PluginRuntimeHost {
         name: plugin.name,
         version: plugin.version,
         directory: plugin.directory,
+        requestedPermissions: plugin.requestedPermissions,
+        compatibility: plugin.compatibility,
+        ...(plugin.entry === undefined ? {} : { entry: plugin.entry }),
       }, channel.pluginPort, abortController.signal);
       void startup.then((lateHandle) => {
         if (startupTimedOut) void lateHandle.terminate();
