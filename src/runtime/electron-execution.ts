@@ -107,6 +107,14 @@ export interface ElectronPluginExecutionAdapter extends PluginExecutionAdapter {
   readonly options: ElectronPluginExecutionOptions;
 }
 
+/** Resolve packaged runtime assets beside the compiled adapter module. */
+export function resolveElectronPluginRuntimeAssets(): Readonly<{ preloadPath: string; bootstrapHtmlPath: string }> {
+  return Object.freeze({
+    preloadPath: fileURLToPath(new URL("./assets/plugin-preload.cjs", import.meta.url)),
+    bootstrapHtmlPath: fileURLToPath(new URL("./assets/plugin-host.html", import.meta.url)),
+  });
+}
+
 const CONNECT_CHANNEL = "yplusplus:plugin-connect";
 const READY_CHANNEL = "yplusplus:plugin-bridge-ready";
 const MAX_ENTRY_BYTES_DEFAULT = 2 * 1024 * 1024;
