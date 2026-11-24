@@ -14,7 +14,7 @@
     "patch": "tsx src/cli.ts patch",
     "restore": "tsx src/cli.ts restore",
     "launch": "tsx src/cli.ts launch",
-    "test": "tsx --test test/*.test.ts",
+    "test": "tsx --test test/*.test.ts test/**/*.test.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "install-managed": "npm run build && node dist/cli.js install",
