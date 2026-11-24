@@ -227,6 +227,7 @@ export function createElectronPluginExecutionAdapter(
       if (options.isSandboxDisabled()) {
         throw new Error("Y++ plugin execution is disabled because Chromium was launched with --no-sandbox.");
       }
+      if (signal?.aborted) throw new Error("Plugin startup was cancelled.");
       const nativePort = getElectronTransferablePort(pluginPort);
       const source = await readPluginEntry(plugin, maxEntryBytes);
       if (signal?.aborted) throw new Error("Plugin startup was cancelled.");
