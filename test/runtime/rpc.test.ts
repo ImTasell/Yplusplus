@@ -125,3 +125,22 @@ test("validates session limits", () => {
   assert.throws(() => new PluginRpcSession({ facade: facade(), maxConcurrentRequests: 0 }), RangeError);
   assert.throws(() => new PluginRpcSession({ facade: facade(), requestTimeoutMs: 1 }), RangeError);
 });
+
+test("timed-out operations retain concurrency slots until they actually settle", async () => {
+  let release!: () => void;
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  const session = new PluginRpcSession({
+    facade: facade(() => blocked),
+    maxConcurrentRequests: 1,
+    requestTimeoutMs: 50,
+  });
+  const first = await session.dispatch(request("slow"));
+  assert.equal(first.ok, false);
+  assert.equal(session.inFlightRequests, 1);
+  const second = await session.dispatch(request("blocked"));
+  assert.equal(second.ok, false);
+  if (!second.ok) assert.equal(second.error.code, "RATE_LIMITED");
+  release();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(session.inFlightRequests, 0);
+});
