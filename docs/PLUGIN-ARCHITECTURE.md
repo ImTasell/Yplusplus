@@ -4,7 +4,7 @@ Status: **Accepted foundation; implementation in progress**
 Target runtime line: **Y++ 0.x**  
 Current bootstrap: **Y++ BOOT 0.1.0**
 
-This document defines the first stable boundary between plugin authors and the Y++ host. It is deliberately narrower than the eventual framework: manifests and lifecycle contracts come first; executable plugin loading, workers, UI, and privileged adapters are separate milestones.
+This document defines the first stable boundary between plugin authors and the Y++ host. It is deliberately narrower than the eventual framework: manifests, discovery, compatibility, and lifecycle contracts come first; executable plugin loading, workers, UI, and privileged adapters are separate milestones.
 
 ## Design goals
 
@@ -55,7 +55,15 @@ Required fields:
 
 Unknown fields are rejected in v1. This keeps typos from silently weakening or changing a plugin's intended configuration. Optional fields will be added only through a manifest-versioned contract.
 
-The manifest parser validates data only. The filesystem discovery layer reads manifests and verifies that each declared entry exists as a regular file whose real path remains inside its plugin directory, including symlink resolution. Discovery does not install plugins, approve permissions, or execute entry points.
+The manifest parser validates data only. The filesystem discovery layer reads manifests and verifies that each declared entry exists as a regular file whose real path remains inside its plugin directory, including symlink resolution. Discovery does not install plugins, approve permissions, or execute entry points. Symlinked plugin directories and symlinked manifests are ignored/rejected.
+
+## API compatibility
+
+Manifest format and plugin API version are separate numbers. The current host implements plugin API generation **1**, exposed as `YPLUSPLUS_PLUGIN_API_VERSION` in `src/plugins/compatibility.ts`.
+
+The compatibility policy currently requires an exact API-generation match. Both newer and older generations are rejected with a structured `unsupported-api-version` failure. The host does not assume that a newer API is backward-compatible with an older one; support for multiple generations must be an explicit future policy.
+
+The plugin's own SemVer `version` identifies the plugin release. It is not compared with the Y++ BOOT package version, and the current manifest does not declare a minimum/maximum host package version.
 
 ## Capability model
 
@@ -72,7 +80,7 @@ No capability is implemented or granted by this RFC. Unknown capability identifi
 
 ## Lifecycle contract
 
-The lifecycle engine will model these states:
+The lifecycle engine models these states:
 
 ```text
 DISCOVERED -> VALIDATING -> WAITING_FOR_APPROVAL -> INITIALIZING -> ACTIVE
@@ -96,7 +104,7 @@ Rules:
 - A plugin's thrown error or rejected promise moves that plugin to `FAILED`; the host records the phase and error while redacting secrets.
 - Repeated requests for the current state are no-ops. Invalid transitions return a structured error.
 
-The initial implementation will define and test transition rules before connecting them to executable modules.
+The current lifecycle module defines and tests transition rules only; it does not execute plugin code or perform side effects.
 
 ## Execution boundary
 
@@ -104,31 +112,32 @@ The eventual runtime should execute plugins outside the privileged Electron main
 
 The exact worker technology is intentionally deferred until the manifest and lifecycle contracts are implemented and measured in the target Electron version.
 
-## Planned package boundaries
+## Implemented package boundaries
 
 - `src/plugins/manifest.ts`: manifest types and pure validation.
 - `src/plugins/lifecycle.ts`: lifecycle states and transition policy.
-- `src/plugins/discovery.ts`: immediate-child directory discovery, manifest validation, duplicate-ID rejection, and entry-point containment checks. Implemented; does not execute code.\n- `src/plugins/manager.ts`: approval and lifecycle orchestration; next milestone.
-- `src/capabilities/`: capability registry, approval records, and scoped facades; later milestone.
-- `src/runtime/`: plugin execution adapter; later milestone.
+- `src/plugins/discovery.ts`: immediate-child directory discovery, manifest validation, duplicate-ID rejection, and entry-point containment checks.
+- `src/plugins/compatibility.ts`: exact plugin API-generation compatibility policy.
+- `src/capabilities/registry.ts`: capability catalog and pure grant-decision policy; no executable capability facade exists yet.
 
-These are conceptual boundaries, not a promise that every directory exists today.
+## Planned package boundaries
 
-## Compatibility policy
+- `src/plugins/manager.ts`: approval and lifecycle orchestration.
+- `src/capabilities/`: approval persistence and scoped facades.
+- `src/runtime/`: isolated plugin execution adapter.
+- Developer tooling, sample plugin, diagnostics, and UI.
 
-- Manifest format and plugin API version are separate numbers.
-- A plugin declares both `manifestVersion` and `apiVersion`.
-- Unsupported manifest versions are rejected.
-- Unsupported API generations are reported as compatibility failures before initialization.
-- A future API may add capabilities without changing the manifest format; changing required manifest fields requires a new manifest version.
+These are conceptual boundaries, not a promise that every planned module exists today.
 
 ## Implementation order
 
-1. Pure manifest schema and validation tests.
-2. Pure lifecycle transition model and exhaustive transition tests.
-3. Capability registry and approval/grant separation.
-4. Plugin discovery and validation, still without executing third-party code. (Discovery implemented.)\n5. Plugin manager, compatibility checks, approval persistence, and lifecycle orchestration.\n6. Sandboxed execution adapter and narrow RPC.\n7. Developer tooling, sample plugin, diagnostics, and UI.
-5. Sandboxed execution adapter and narrow RPC.
-6. Developer tooling, sample plugin, diagnostics, and UI.
+1. Pure manifest schema and validation tests. (Implemented.)
+2. Pure lifecycle transition model and exhaustive transition tests. (Implemented.)
+3. Capability registry and approval/grant separation. (Policy foundation implemented; persistence/facades remain.)
+4. Plugin discovery and validation, without executing third-party code. (Implemented.)
+5. Plugin API compatibility policy. (Implemented.)
+6. Plugin manager, approval persistence, and lifecycle orchestration.
+7. Sandboxed execution adapter and narrow RPC.
+8. Developer tooling, sample plugin, diagnostics, and UI.
 
 The current Y++ BOOT patcher and preload remain independent of this plugin subsystem. Plugin work must not destabilize the verified Yapper 1.2.7 integration.
