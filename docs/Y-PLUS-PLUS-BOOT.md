@@ -125,11 +125,11 @@ One GitHub Actions integration run extracted the captured official 1.2.7 AppImag
 - The session registration API does not rerun for in-page navigations; it runs on matching document navigations.
 - The Y++ API is not a plugin security sandbox. Plugin execution and capability brokering are future milestones.
 
-## Next verification step
+## Remaining verification milestones
 
-1. Verify that external sign-in popups and unrelated pages never receive the Y++ bridge.
-2. Test reloads and same-origin navigation behavior.
-3. Build a managed installation path and desktop launcher that can safely reapply patches after Yapper updates.
-4. Implement Y++-managed update checks before re-enabling automatic updates.
-5. Run a local Fedora/KDE smoke test.
+Automated regression coverage now exists for origin isolation and document lifecycle behavior (external origins, popup contexts, same-document SPA navigation, same-origin reloads, and fresh-document cross-origin navigation). These tests execute the actual preload source with mocked Electron boundaries; live Chromium popup/navigation testing remains part of the final desktop smoke test.
+
+1. Build a managed installation path and desktop launcher that can safely reapply patches after Yapper updates.
+2. Implement Y++-managed update checks before re-enabling automatic updates.
+3. Run a local Fedora/KDE smoke test.
 
