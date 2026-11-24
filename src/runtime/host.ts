@@ -143,6 +143,7 @@ export class PluginRuntimeHost {
       const startup = this.#options.execution.start({
         id: plugin.id,
         name: plugin.name,
+        trusted: true,
         version: plugin.version,
         directory: plugin.directory,
         requestedPermissions: plugin.requestedPermissions,
