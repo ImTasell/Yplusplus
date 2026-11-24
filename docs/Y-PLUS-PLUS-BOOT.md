@@ -180,8 +180,8 @@ One GitHub Actions integration run extracted the captured official 1.2.7 AppImag
 Completed:
 - Origin isolation and document lifecycle regression coverage.
 - Managed AppImage installation, versioned AppDir storage, a self-contained Y++ runtime, and a generated desktop launcher.
+- Explicit Y++ update checks and SHA-512-verified AppImage downloads, with fail-closed compatibility checks. Yapper's automatic updater remains disabled.
 
 Remaining:
-1. Implement Y++-managed update checks before re-enabling automatic updates.
-2. Run a local Fedora/KDE smoke test, including live OAuth popup/navigation behavior.
+1. Run a local Fedora/KDE smoke test, including a live update-feed check and OAuth popup/navigation behavior. The live `latest-linux.yml` response has not yet been verified from this environment; the update parser and download path are covered by offline tests.
 
