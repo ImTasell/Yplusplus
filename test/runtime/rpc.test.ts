@@ -110,14 +110,21 @@ test("maps broker revocation denials to a generic RPC denial", async () => {
   }
 });
 
-test("times out capability operations and releases concurrency slot", async () => {
+test("times out capability operations but retains the slot until the operation settles", async () => {
+  let release!: () => void;
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
   const session = new PluginRpcSession({
-    facade: facade(() => new Promise<void>(() => undefined)),
+    facade: facade(() => blocked),
+    maxConcurrentRequests: 1,
     requestTimeoutMs: 50,
   });
-  const result = await session.dispatch(request());
+  const result = await session.dispatch(request("timeout"));
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.error.code, "REQUEST_TIMEOUT");
+  assert.equal(session.inFlightRequests, 1);
+
+  release();
+  await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(session.inFlightRequests, 0);
 });
 
