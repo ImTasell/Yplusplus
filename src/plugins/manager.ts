@@ -19,7 +19,7 @@ export interface ManagedPlugin {
   readonly directory: string;
   readonly entry?: string;
   readonly state: PluginState;
-  readonly trusted: boolean;
+  readonly trusted?: boolean;
   readonly requestedPermissions: readonly string[];
   readonly approvedPermissions: readonly string[];
   readonly deniedPermissions: readonly { readonly id: string; readonly reason: "unsupported" | "not-approved" }[];
