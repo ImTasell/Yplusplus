@@ -88,6 +88,8 @@ test("malformed JSON fails closed and is not overwritten", async () => {
 
 test("symlinked store files are rejected", async () => {
   const { root, store } = await makeStore();
+  const { mkdir } = await import("node:fs/promises");
+  await mkdir(join(root, "config"), { recursive: true });
   const target = join(root, "target.json");
   await writeFile(target, JSON.stringify({ storeVersion: 1, records: [] }), { mode: 0o600 });
   await symlink(target, store.filePath);
