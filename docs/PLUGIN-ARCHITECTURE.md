@@ -55,7 +55,7 @@ Required fields:
 
 Unknown fields are rejected in v1. This keeps typos from silently weakening or changing a plugin's intended configuration. Optional fields will be added only through a manifest-versioned contract.
 
-The manifest parser validates data only. It does not read files, resolve paths, install plugins, approve permissions, or execute the entry point. A future installer must resolve the entry against the plugin root and verify the resulting real path remains inside that root (including symlink handling).
+The manifest parser validates data only. The filesystem discovery layer reads manifests and verifies that each declared entry exists as a regular file whose real path remains inside its plugin directory, including symlink resolution. Discovery does not install plugins, approve permissions, or execute entry points.
 
 ## Capability model
 
@@ -108,7 +108,7 @@ The exact worker technology is intentionally deferred until the manifest and lif
 
 - `src/plugins/manifest.ts`: manifest types and pure validation.
 - `src/plugins/lifecycle.ts`: lifecycle states and transition policy.
-- `src/plugins/manager.ts`: discovery and orchestration; later milestone.
+- `src/plugins/discovery.ts`: immediate-child directory discovery, manifest validation, duplicate-ID rejection, and entry-point containment checks. Implemented; does not execute code.\n- `src/plugins/manager.ts`: approval and lifecycle orchestration; next milestone.
 - `src/capabilities/`: capability registry, approval records, and scoped facades; later milestone.
 - `src/runtime/`: plugin execution adapter; later milestone.
 
@@ -127,7 +127,7 @@ These are conceptual boundaries, not a promise that every directory exists today
 1. Pure manifest schema and validation tests.
 2. Pure lifecycle transition model and exhaustive transition tests.
 3. Capability registry and approval/grant separation.
-4. Plugin discovery and manager, still without executing third-party code.
+4. Plugin discovery and validation, still without executing third-party code. (Discovery implemented.)\n5. Plugin manager, compatibility checks, approval persistence, and lifecycle orchestration.\n6. Sandboxed execution adapter and narrow RPC.\n7. Developer tooling, sample plugin, diagnostics, and UI.
 5. Sandboxed execution adapter and narrow RPC.
 6. Developer tooling, sample plugin, diagnostics, and UI.
 
