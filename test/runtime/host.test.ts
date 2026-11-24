@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MessageChannel, type MessagePort } from "node:worker_threads";
+
 import type { ManagedPlugin } from "../../src/plugins/manager.js";
 import { PluginRuntimeHost, type PluginExecutionHandle } from "../../src/runtime/host.js";
 import type { RpcMessagePort } from "../../src/runtime/message-port.js";
@@ -16,14 +16,11 @@ function plugin(overrides: Partial<ManagedPlugin> = {}): ManagedPlugin {
     requestedPermissions: [],
     approvedPermissions: [],
     deniedPermissions: [],
-    compatibility: { compatible: true, apiVersion: 1, hostApiVersion: 1 } as ManagedPlugin["compatibility"],
+    compatibility: { compatible: true, pluginApiVersion: 1, hostApiVersion: 1 },
     ...overrides,
   };
 }
 
-function port(value: MessagePort): RpcMessagePort {
-  return value as unknown as RpcMessagePort;
-}
 
 function handle() {
   let exitListener: ((reason?: unknown) => void) | undefined;
@@ -42,13 +39,26 @@ function handle() {
   };
 }
 
+class TestPort implements RpcMessagePort {
+  closed = false;
+  #listener?: (event: { readonly data: unknown }) => void;
+  postMessage(_message: unknown): void {}
+  addEventListener(_type: "message", listener: (event: { readonly data: unknown }) => void): void { this.#listener = listener; }
+  removeEventListener(_type: "message", listener: (event: { readonly data: unknown }) => void): void {
+    if (this.#listener === listener) delete this.#listener;
+  }
+  start(): void {}
+  close(): void { this.closed = true; }
+}
+
 function setup(start: (pluginPort: RpcMessagePort) => Promise<PluginExecutionHandle>, timeout = 500) {
-  const channels: MessageChannel[] = [];
+  const channels: Array<[TestPort, TestPort]> = [];
   const runtime = new PluginRuntimeHost({
     createChannel: () => {
-      const channel = new MessageChannel();
-      channels.push(channel);
-      return { hostPort: port(channel.port1), pluginPort: port(channel.port2) };
+      const hostPort = new TestPort();
+      const pluginPort = new TestPort();
+      channels.push([hostPort, pluginPort]);
+      return { hostPort, pluginPort };
     },
     createSession: () => ({ dispatch: async () => ({}) } as unknown as PluginRpcSession),
     execution: { start: (_plugin, pluginPort) => start(pluginPort) },
@@ -80,8 +90,8 @@ test("marks startup failures FAILED and closes both channel endpoints", async ()
   const { runtime, channels } = setup(async () => { throw new Error("worker failed"); });
   await assert.rejects(runtime.start(plugin()), /worker failed/);
   assert.equal(runtime.get("dev.example.runtime")?.state, "FAILED");
-  assert.equal(channels[0]?.port1.hasRef(), false);
-  assert.equal(channels[0]?.port2.hasRef(), false);
+  assert.equal(channels[0]?.[0].closed, true);
+  assert.equal(channels[0]?.[1].closed, true);
 });
 
 test("times out startup and terminates a worker that resolves late", async () => {
