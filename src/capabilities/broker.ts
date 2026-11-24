@@ -88,7 +88,7 @@ export async function createPluginCapabilityFacade(
       plugin.compatibility.pluginApiVersion !== plugin.compatibility.hostApiVersion) {
     throw new CapabilityDeniedError(
       "plugin.lifecycle",
-      "Only compatible plugins in READY state can receive a capability facade.",
+      "Only explicitly trusted, compatible plugins in READY state can receive a capability facade.",
     );
   }
 
