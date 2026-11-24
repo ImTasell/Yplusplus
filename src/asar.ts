@@ -1,15 +1,17 @@
 import { createHash } from "node:crypto";
 
+export interface AsarIntegrity {
+  algorithm: string;
+  hash: string;
+  blockSize?: number;
+  blocks?: string[];
+}
+
 export interface AsarFileEntry {
   size: number;
   offset?: string;
   unpacked?: boolean;
-  integrity?: {
-    algorithm: string;
-    hash: string;
-    blockSize?: number;
-    blocks?: string[];
-  };
+  integrity?: AsarIntegrity;
   [key: string]: unknown;
 }
 
@@ -143,7 +145,7 @@ export function readAsarFile(archive: ParsedAsar, name: string): Buffer {
   return contents;
 }
 
-export function makeIntegrity(contents: Buffer): AsarFileEntry["integrity"] {
+export function makeIntegrity(contents: Buffer): AsarIntegrity {
   const hash = createHash("sha256").update(contents).digest("hex");
   const blocks: string[] = [];
 
