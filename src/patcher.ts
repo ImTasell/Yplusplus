@@ -1,6 +1,7 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { copyFileSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { encodeAsar, getRootFile, makeIntegrity, parseAsar, readAsarFile, type AsarFileEntry } from "./asar.js";
+import { YPLUSPLUS_PRELOAD_SOURCE } from "./preload-source.js";
 
 export const SUPPORTED_YAPPER_VERSION = "1.2.7";
 export const PATCH_MARKER = "/* Y++ BOOTSTRAP: BEGIN */";
@@ -18,39 +19,7 @@ export interface PatchResult {
 }
 
 function preloadSource(): Buffer {
-  // The checked-in preload is deliberately self-contained and uses only Electron's sandbox preload API.
-  // The build step emits this same source as a standalone CommonJS preload bundle.
-  const source = [
-    '"use strict";',
-    'const { contextBridge } = require("electron");',
-    'const ALLOWED_HOSTS = new Set(["www.yapper.website", "yapper.website", "www.yapin.gg", "yapin.gg"]);',
-    'const VERSION = "0.1.0";',
-    'try {',
-    '  const currentUrl = new URL(globalThis.location.href);',
-    '  const allowed = currentUrl.protocol === "https:" && ALLOWED_HOSTS.has(currentUrl.hostname);',
-    '  if (process.isMainFrame && allowed) {',
-    '    contextBridge.exposeInMainWorld("yplusplus", {',
-    '      version: VERSION,',
-    '      runtime: "yapper-desktop",',
-    '      ready: true,',
-    '      getStatus: () => ({ ready: true, version: VERSION, origin: currentUrl.origin })',
-    '    });',
-    '  }',
-    '} catch (error) {',
-    '  console.error("[Y++] Preload initialization failed:", error);',
-    '}',
-    ""
-  ].join("\n");
-  return Buffer.from(source, "utf8");
-}
-
-function getPackageMetadata(archiveBuffer: Buffer): { name?: string; version?: string } {
-  const parsed = parseAsar(archiveBuffer);
-  const packageJson = JSON.parse(readAsarFile(parsed, "package.json").toString("utf8")) as {
-    name?: string;
-    version?: string;
-  };
-  return packageJson;
+  return Buffer.from(YPLUSPLUS_PRELOAD_SOURCE, "utf8");
 }
 
 function makeRegistrationSnippet(): string {
@@ -94,7 +63,6 @@ export function patchAsarBuffer(archiveBuffer: Buffer): { buffer: Buffer; status
     throw new Error(`Unsupported Yapper version "${metadata.version ?? "unknown"}"; this patch only supports ${SUPPORTED_YAPPER_VERSION}.`);
   }
 
-  const mainEntry = getRootFile(parsed.header, "main.js");
   const mainSource = readAsarFile(parsed, "main.js").toString("utf8");
 
   if (mainSource.includes(PATCH_MARKER)) {
