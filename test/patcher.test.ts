@@ -99,3 +99,17 @@ test("AppDir patch creates a backup and restore returns the exact original archi
     rmSync(appDir, { recursive: true, force: true });
   }
 });
+
+test("launch environment removes APPIMAGE to protect extracted AppRun from auto-updater replacement", async () => {
+  const { buildLaunchEnvironment } = await import("../src/launcher.js");
+  const env = buildLaunchEnvironment("/opt/yplusplus/yapper", {
+    APPIMAGE: "/opt/yplusplus/yapper/AppRun",
+    PATH: "/usr/bin",
+    LD_LIBRARY_PATH: "/usr/lib",
+    XDG_DATA_DIRS: "/usr/share"
+  });
+  assert.equal(env.APPIMAGE, undefined);
+  assert.equal(env.APPDIR, "/opt/yplusplus/yapper");
+  assert.ok(env.PATH?.startsWith("/opt/yplusplus/yapper:"));
+  assert.ok(env.LD_LIBRARY_PATH?.startsWith("/opt/yplusplus/yapper/usr/lib:"));
+});
