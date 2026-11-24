@@ -2,12 +2,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import type { PluginManagerService } from "./plugin-manager-service.js";
 
-interface ManagerWebContents {
-  readonly mainFrame: unknown;
-  on(event: string, listener: (...args: any[]) => void): this;
-  setWindowOpenHandler(handler: () => { action: "deny" }): void;
-  isDestroyed(): boolean;
-}
 interface ManagerSession {
   readonly webRequest: {
     onBeforeRequest(
@@ -18,9 +12,15 @@ interface ManagerSession {
   setPermissionRequestHandler(handler: ((_contents: unknown, _permission: string, callback: (allowed: boolean) => void) => void) | null): void;
   setPermissionCheckHandler(handler: (() => boolean) | null): void;
 }
+interface ManagerWebContents {
+  readonly mainFrame: unknown;
+  readonly session: ManagerSession;
+  on(event: string, listener: (...args: any[]) => void): this;
+  setWindowOpenHandler(handler: () => { action: "deny" }): void;
+  isDestroyed(): boolean;
+}
 interface ManagerWindow {
   readonly webContents: ManagerWebContents;
-  readonly session: ManagerSession;
   loadFile(path: string): Promise<void>;
   show(): void;
   focus(): void;
@@ -70,6 +70,7 @@ const CHANNELS = [
   "yplusplus:manager:approve",
   "yplusplus:manager:revoke",
   "yplusplus:manager:unload",
+  "yplusplus:manager:start",
 ] as const;
 
 export function createPluginManagerWindow(options: PluginManagerWindowOptions): { open(): Promise<void> } {
@@ -123,7 +124,8 @@ export function createPluginManagerWindow(options: PluginManagerWindowOptions): 
         [CHANNELS[2], async (event, id, version) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.untrust(id, version); }],
         [CHANNELS[3], async (event, id, version, capabilities) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.approve(id, version, capabilities); }],
         [CHANNELS[4], async (event, id, version, capabilities) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.revoke(id, version, capabilities); }],
-        [CHANNELS[5], async (event, id, version) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.unload(id, version); }],\n        [CHANNELS[6], async (event, id, version) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.start(id, version); }],
+        [CHANNELS[5], async (event, id, version) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.unload(id, version); }],
+        [CHANNELS[6], async (event, id, version) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.start(id, version); }],
       ];
       for (const [channel, handler] of handlers) options.ipcMain.handle(channel, handler);
 
@@ -145,7 +147,6 @@ export function createPluginManagerWindow(options: PluginManagerWindowOptions): 
         await created.loadFile(htmlPath);
       } catch (error) {
         for (const channel of CHANNELS) options.ipcMain.removeHandler(channel);
-        if (!created.isDestroyed()) created.show();
         window = undefined;
         throw error;
       }
