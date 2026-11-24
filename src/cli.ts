@@ -10,6 +10,7 @@ Usage:
   yplusplus inspect <extracted-appdir>
   yplusplus patch <extracted-appdir>
   yplusplus restore <extracted-appdir>
+  yplusplus launch <patched-appdir> [electron-args...]
 
 The AppDir must be extracted from the official Yapper Linux AppImage first.
 Y++ never modifies the original AppImage.
@@ -49,6 +50,10 @@ try {
     }
     case "restore": {
       console.log(`Restored original archive: ${restoreAppDir(appDir)}`);
+      break;
+    }
+    case "launch": {
+      launchAppDir(appDir, process.argv.slice(4));
       break;
     }
     default:
