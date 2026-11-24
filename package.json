@@ -19,7 +19,8 @@
     "build": "tsc && node scripts/copy-runtime-assets.mjs",
     "install-managed": "npm run build && node dist/src/cli.js install",
     "check-updates": "tsx src/cli.ts check-updates",
-    "update-managed": "npm run build && node dist/src/cli.js update"
+    "update-managed": "npm run build && node dist/src/cli.js update",
+    "plugins": "tsx src/cli.ts plugins"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
