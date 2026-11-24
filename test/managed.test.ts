@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { encodeAsar, makeIntegrity } from "../src/asar.js";
 import { inspectAppDir } from "../src/patcher.js";
 import {
+  installAppImage,
   installExtractedAppDir,
   managedPaths,
   quoteDesktopArg,
@@ -29,7 +30,7 @@ const MAIN = Buffer.from([
 ].join("\n"));
 const PRELOAD = Buffer.from("original Yapper preload");
 
-function makeAppDir(appDir: string, version = "1.2.7"): void {
+function makeAppDir(appDir: string, version = "1.2.7", preload = PRELOAD): void {
   const resources = join(appDir, "resources");
   mkdirSync(resources, { recursive: true });
   const packageJson = Buffer.from(JSON.stringify({ name: "yapper-desktop", version }));
@@ -46,15 +47,15 @@ function makeAppDir(appDir: string, version = "1.2.7"): void {
         integrity: makeIntegrity(MAIN)
       },
       "preload.js": {
-        size: PRELOAD.length,
+        size: preload.length,
         offset: String(packageJson.length + MAIN.length),
-        integrity: makeIntegrity(PRELOAD)
+        integrity: makeIntegrity(preload)
       }
     }
   };
   writeFileSync(
     join(resources, "app.asar"),
-    encodeAsar(header, Buffer.concat([packageJson, MAIN, PRELOAD]))
+    encodeAsar(header, Buffer.concat([packageJson, MAIN, preload]))
   );
   const executable = join(appDir, "yapper-desktop");
   writeFileSync(executable, "#!/bin/sh\nexit 0\n");
@@ -141,6 +142,63 @@ test("managed install patches atomically, installs its runtime and desktop entry
     assert.equal(second.appDir, first.appDir);
     assert.deepEqual(readFileSync(join(second.appDir, "resources", "app.asar")), installedArchive);
     assert.equal(inspectAppDir(second.appDir).patched, true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("same-version AppImage payload changes are rejected instead of silently reusing stale files", () => {
+  const root = mkdtempSync(join(tmpdir(), "yplusplus-managed-version-collision-"));
+  const firstExtracted = join(root, "first");
+  const secondExtracted = join(root, "second");
+  const runtimeSource = join(root, "dist");
+  const dataHome = join(root, "data");
+  mkdirSync(firstExtracted, { recursive: true });
+  mkdirSync(secondExtracted, { recursive: true });
+  makeAppDir(firstExtracted);
+  makeAppDir(secondExtracted, "1.2.7", Buffer.from("different original preload"));
+  makeRuntimeSource(runtimeSource);
+
+  try {
+    const installed = installExtractedAppDir(firstExtracted, { dataHome, runtimeSourceDir: runtimeSource });
+    assert.throws(
+      () => installExtractedAppDir(secondExtracted, { dataHome, runtimeSourceDir: runtimeSource }),
+      /different AppImage payload/
+    );
+    assert.equal(inspectAppDir(installed.appDir).patched, true);
+    assert.equal(existsSync(secondExtracted), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("AppImage install invokes the extractor without modifying the source file", () => {
+  const root = mkdtempSync(join(tmpdir(), "yplusplus-appimage-extract-test-"));
+  const sourceAppDir = join(root, "source-appdir");
+  const fakeAppImage = join(root, "fake.AppImage");
+  const runtimeSource = join(root, "dist");
+  const dataHome = join(root, "data");
+  mkdirSync(sourceAppDir, { recursive: true });
+  makeAppDir(sourceAppDir);
+  makeRuntimeSource(runtimeSource);
+  writeFileSync(
+    fakeAppImage,
+    `#!/bin/sh
+if [ "$1" = "--appimage-extract" ]; then
+  cp -a "${sourceAppDir}" squashfs-root
+  exit 0
+fi
+exit 2
+`
+  );
+  chmodSync(fakeAppImage, 0o755);
+
+  try {
+    const result = installAppImage(fakeAppImage, { dataHome, runtimeSourceDir: runtimeSource });
+    assert.equal(result.status, "installed");
+    assert.equal(existsSync(fakeAppImage), true);
+    assert.equal(inspectAppDir(result.appDir).patched, true);
+    assert.equal(existsSync(join(dataHome, "yplusplus", "versions", ".yplusplus-extract-")), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
