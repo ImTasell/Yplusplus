@@ -2,7 +2,8 @@
  * Y++ main-process bootstrap for the managed Yapper installation.
  *
  * This module is dynamically imported by the version-specific BOOT patch.
- * It owns discovery, persistent approvals, runtime startup, and shutdown.
+ * It owns discovery, persistent execution trust, capability approvals,
+ * runtime startup, and shutdown.
  */
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -35,7 +36,8 @@ export interface YplusplusBootstrapResult {
   readonly discovered: number;
   readonly rejected: number;
   readonly started: readonly string[];
-  readonly waitingForTrust: readonly string[];\n  readonly waitingForApproval: readonly string[];
+  readonly waitingForTrust: readonly string[];
+  readonly waitingForApproval: readonly string[];
   readonly failed: readonly string[];
 }
 
@@ -45,9 +47,8 @@ function dataHome(): string {
 }
 
 /**
- * Start only plugins that are READY under the persistent host approval store.
- * A plugin requesting permissions cannot run until a trusted approval UI
- * explicitly grants them. No implicit permission grants are made here.
+ * Start only explicitly trusted, capability-approved releases. Discovery alone
+ * never grants execution trust, including for plugins requesting zero APIs.
  */
 export async function startYplusplusMain(dependencies: YplusplusElectronDependencies): Promise<YplusplusBootstrapResult> {
   await dependencies.app.whenReady();
@@ -85,7 +86,14 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     }
   }
 
-  const waitingForTrust = report.plugins\n    .filter((plugin) => plugin.state === "WAITING_FOR_TRUST")\n    .map((plugin) => plugin.id);\n  for (const plugin of waitingForTrust) {\n    console.info(`[Y++] Plugin awaits explicit trust: ${plugin}`);\n  }\n\n  const waitingForApproval = report.plugins
+  const waitingForTrust = report.plugins
+    .filter((plugin) => plugin.state === "WAITING_FOR_TRUST")
+    .map((plugin) => plugin.id);
+  for (const plugin of waitingForTrust) {
+    console.info(`[Y++] Plugin awaits explicit trust: ${plugin}`);
+  }
+
+  const waitingForApproval = report.plugins
     .filter((plugin) => plugin.state === "WAITING_FOR_APPROVAL")
     .map((plugin) => plugin.id);
   for (const plugin of waitingForApproval) {
@@ -99,17 +107,13 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
   let allowQuit = false;
   dependencies.app.on("before-quit", (event) => {
     if (allowQuit) return;
-    // Electron may emit before-quit more than once. Keep preventing exit until
-    // every runtime has finished teardown, even if another quit is requested.
     event.preventDefault();
     if (shutdownStarted) return;
     shutdownStarted = true;
     void Promise.allSettled(runtime.list().map((item) => runtime.unload(item.id)))
       .then((results) => {
         for (const result of results) {
-          if (result.status === "rejected") {
-            console.error("[Y++] Runtime shutdown error:", result.reason);
-          }
+          if (result.status === "rejected") console.error("[Y++] Runtime shutdown error:", result.reason);
         }
       })
       .finally(() => {
@@ -123,6 +127,7 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     discovered: discovery.plugins.length,
     rejected: discovery.rejected.length,
     started: Object.freeze(started),
+    waitingForTrust: Object.freeze(waitingForTrust),
     waitingForApproval: Object.freeze(waitingForApproval),
     failed: Object.freeze(failed),
   });
