@@ -300,7 +300,10 @@ export function createElectronPluginExecutionAdapter(
       };
 
       signal?.addEventListener("abort", onAbort, { once: true });
-      if (signal?.aborted) onAbort();
+      if (signal?.aborted) {
+        onAbort();
+        throw new Error("Plugin startup was cancelled.");
+      }
 
       try {
         const startup = (async (): Promise<void> => {
