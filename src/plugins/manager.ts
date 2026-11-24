@@ -118,6 +118,11 @@ export async function inspectPlugins(
   discovery: PluginDiscoveryReport,
   options: PluginManagerOptions,
 ): Promise<PluginManagerReport> {
+  const hostApiVersion = options.hostApiVersion ?? YPLUSPLUS_PLUGIN_API_VERSION;
+  if (!Number.isSafeInteger(hostApiVersion) || hostApiVersion < 1) {
+    throw new RangeError("Host API version must be a positive safe integer.");
+  }
+
   const plugins: ManagedPlugin[] = [];
   for (const plugin of discovery.plugins) {
     try {
@@ -126,7 +131,7 @@ export async function inspectPlugins(
       const message = error instanceof Error ? error.message : "Approval lookup failed.";
       const compatibility = checkPluginCompatibility(
         plugin.manifest,
-        options.hostApiVersion ?? YPLUSPLUS_PLUGIN_API_VERSION,
+        hostApiVersion,
       );
       plugins.push(Object.freeze({
         id: plugin.manifest.id,
