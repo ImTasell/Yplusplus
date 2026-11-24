@@ -92,6 +92,7 @@ class FakeWindow {
   destroyed = false;
   loadPath = "";
   constructor(readonly options: unknown) { FakeWindow.latest = this; }
+  once(event: "closed", listener: () => void): this { this.listeners.set(event, listener); return this; }
   async loadFile(filePath: string): Promise<void> { this.loadPath = filePath; }
   destroy(): void {
     if (this.destroyed) return;
