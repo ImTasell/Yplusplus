@@ -83,7 +83,7 @@ No capability is implemented or granted by this RFC. Unknown capability identifi
 The lifecycle engine models these states:
 
 ```text
-DISCOVERED -> VALIDATING -> WAITING_FOR_APPROVAL -> INITIALIZING -> ACTIVE
+DISCOVERED -> VALIDATING -> WAITING_FOR_APPROVAL -> READY -> INITIALIZING -> ACTIVE
      |             |                 |                 |
      +----------> FAILED <-----------+-----------------+
                                                         |
@@ -118,11 +118,12 @@ The exact worker technology is intentionally deferred until the manifest and lif
 - `src/plugins/lifecycle.ts`: lifecycle states and transition policy.
 - `src/plugins/discovery.ts`: immediate-child directory discovery, manifest validation, duplicate-ID rejection, and entry-point containment checks.
 - `src/plugins/compatibility.ts`: exact plugin API-generation compatibility policy.
+- `src/plugins/manager.ts`: discovery/compatibility/approval orchestration and lifecycle snapshot; stops at READY and never executes entries.
 - `src/capabilities/registry.ts`: capability catalog and pure grant-decision policy; no executable capability facade exists yet.
 
 ## Planned package boundaries
 
-- `src/plugins/manager.ts`: approval and lifecycle orchestration.
+- Persistent approval storage and lifecycle activation orchestration (follow-up to the manager inspection layer).
 - `src/capabilities/`: approval persistence and scoped facades.
 - `src/runtime/`: isolated plugin execution adapter.
 - Developer tooling, sample plugin, diagnostics, and UI.
@@ -136,8 +137,9 @@ These are conceptual boundaries, not a promise that every planned module exists 
 3. Capability registry and approval/grant separation. (Policy foundation implemented; persistence/facades remain.)
 4. Plugin discovery and validation, without executing third-party code. (Implemented.)
 5. Plugin API compatibility policy. (Implemented.)
-6. Plugin manager, approval persistence, and lifecycle orchestration.
-7. Sandboxed execution adapter and narrow RPC.
-8. Developer tooling, sample plugin, diagnostics, and UI.
+6. Plugin manager inspection/orchestration through READY. (Implemented; approval provider is injected.)
+7. Persistent approval storage and explicit lifecycle activation orchestration.
+8. Sandboxed execution adapter and narrow RPC.
+9. Developer tooling, sample plugin, diagnostics, and UI.
 
 The current Y++ BOOT patcher and preload remain independent of this plugin subsystem. Plugin work must not destabilize the verified Yapper 1.2.7 integration.
