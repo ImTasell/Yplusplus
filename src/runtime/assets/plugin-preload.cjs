@@ -78,7 +78,19 @@ ipcRenderer.on(CONNECT_CHANNEL, (event, payload) => {
     });
   };
 
+  const onClose = () => {
+    if (closed) return;
+    closed = true;
+    port.removeEventListener("message", onMessage);
+    for (const item of pending.values()) {
+      clearTimeout(item.timer);
+      item.reject(new Error("The Y++ plugin session is closed."));
+    }
+    pending.clear();
+  };
+
   port.addEventListener("message", onMessage);
+  port.addEventListener("close", onClose);
   port.start();
 
   const api = Object.freeze({
