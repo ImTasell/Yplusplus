@@ -65,6 +65,7 @@ test("trust store is written with private directory and file modes", async () =>
 
 test("symlink trust store fails closed", async () => {
   const { root, store } = await setup();
+  await mkdir(path.dirname(store.filePath), { recursive: true });
   const target = path.join(root, "target.json");
   await writeFile(target, JSON.stringify({ storeVersion: 1, trusted: [] }));
   await chmod(target, 0o600);
