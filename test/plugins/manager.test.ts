@@ -91,3 +91,17 @@ test("preserves discovery rejections in the manager report", async () => {
     assert.equal(report.rejected[0]?.issues[0]?.code, "missing-manifest");
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test("rejects invalid host API configuration instead of reporting a plugin approval failure", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "yplusplus-manager-"));
+  try {
+    await fixture(root, "simple", makeManifest("dev.example.invalid-host"));
+    await assert.rejects(
+      inspectPlugins(await discoverPlugins(root), {
+        hostApiVersion: 0,
+        getApprovedPermissions: async () => new Set(),
+      }),
+      RangeError,
+    );
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
