@@ -1,3 +1,4 @@
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
@@ -84,7 +85,7 @@ function manifest(version: string, fileUrl = "https://files.yapper.website/deskt
 }
 
 function responseFetcher(body: string | Buffer, status = 200, headers: Record<string, string> = {}): UpdateFetcher {
-  return async () => new Response(body, { status, headers });
+  return async () => new Response(typeof body === "string" ? body : body.toString("utf8"), { status, headers });
 }
 
 test("compares stable and prerelease semantic versions correctly", () => {
