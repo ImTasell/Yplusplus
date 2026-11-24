@@ -110,3 +110,12 @@ test("corrupt schema fails closed", async () => {
   await writeFile(store.filePath, JSON.stringify({ storeVersion: 99, records: [] }), { mode: 0o600 });
   await assert.rejects(store.getApprovedPermissions("dev.example.test", "1.0.0"), ApprovalStoreError);
 });
+
+test("approval store refuses files with group or world permissions", async () => {
+  const { store } = await makeStore();
+  const { mkdir, chmod } = await import("node:fs/promises");
+  await mkdir(join(store.filePath, ".."), { recursive: true });
+  await writeFile(store.filePath, JSON.stringify({ storeVersion: 1, records: [] }), { mode: 0o600 });
+  await chmod(store.filePath, 0o644);
+  await assert.rejects(store.getApprovedPermissions("dev.example.test", "1.0.0"), ApprovalStoreError);
+});
