@@ -44,6 +44,18 @@ function makeRegistrationSnippet(): string {
     "  } catch (error) {",
     "    console.error('[Y++] Preload registration failed; continuing without Y++:', error);",
     "  }",
+    "  try {",
+    "    const runtimeEntry = process.env.YPLUSPLUS_RUNTIME_ENTRY;",
+    "    if (runtimeEntry) {",
+    "      import(require('node:url').pathToFileURL(runtimeEntry).href)",
+    "        .then((runtime) => runtime.startYplusplusMain({ app, BrowserWindow, ipcMain, MessageChannelMain: require('electron').MessageChannelMain, Notification }))",
+    "        .catch((error) => console.error('[Y++] Main-process integration failed safely:', error));",
+    "    } else {",
+    "      console.warn('[Y++] Managed runtime path is not configured; plugin runtime is disabled.');",
+    "    }",
+    "  } catch (error) {",
+    "    console.error('[Y++] Main-process integration could not start:', error);",
+    "  }",
     "  /* Y++ BOOTSTRAP: END */"
   ].join("\n");
 }
