@@ -244,6 +244,7 @@ export function createElectronPluginExecutionAdapter(
       const exitListeners = new Set<(reason?: unknown) => void>();
       let rejectStartup!: (error: Error) => void;
       const failed = new Promise<never>((_, reject) => { rejectStartup = reject; });
+      void failed.catch(() => undefined);
 
       const notifyExit = (reason?: unknown): void => {
         if (exited) return;
