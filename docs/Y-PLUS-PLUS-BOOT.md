@@ -55,7 +55,7 @@ The patcher creates `resources/app.asar.yplusplus-original` once and writes the 
 
 ## Development
 
-Requires Node.js 20.11 or newer. Node 22.16+ can run the TypeScript source directly using built-in type stripping.
+Requires Node.js 20.11 or newer and npm. The CLI runs through `tsx`; the production build is compiled with TypeScript.
 
 ```bash
 npm install
@@ -95,7 +95,7 @@ npm run launch -- /tmp/yapper-extract/squashfs-root
 
 Y++ starts the Electron binary directly and recreates the AppRun library environment. It intentionally removes `APPIMAGE` from the child environment. The packaged `electron-updater` uses `APPIMAGE` as the path it unlinks and replaces during an update; AppRun sets that variable to itself when running an extracted AppDir. Leaving it unset prevents Yapper's updater from replacing the AppRun script or bypassing Y++ with an unpatched restart. As a consequence, Yapper's built-in AppImage updater is inactive under this launcher. Y++ must implement version detection, download, extraction, patching, and relaunch before automatic updates can be restored.
 
-A one-time GitHub Actions integration run extracted the captured official 1.2.7 AppImage, inspected its real ASAR, patched it successfully, verified the patch marker, restored the backup, and compared the restored archive byte-for-byte with the original. The temporary integration job was removed after that check.
+One GitHub Actions integration run extracted the captured official 1.2.7 AppImage, inspected its real ASAR, patched it successfully, verified the patch marker, restored the backup, and compared the restored archive byte-for-byte with the original. A second headless Electron integration run launched the patched AppDir under Xvfb and queried the live renderer over Chromium DevTools Protocol. It confirmed `window.yplusplus` (`version: 0.1.0`, `ready: true`) and the original `window.yapperDesktop` were both present. The temporary integration job was removed after verification.
 
 ## Known limitations
 
@@ -108,22 +108,9 @@ A one-time GitHub Actions integration run extracted the captured official 1.2.7 
 
 ## Next verification step
 
-Run a patched extracted AppDir in a graphical Linux session and confirm:
+1. Verify that external sign-in popups and unrelated pages never receive the Y++ bridge.
+2. Test reloads and same-origin navigation behavior.
+3. Build a managed installation path and desktop launcher that can safely reapply patches after Yapper updates.
+4. Implement Y++-managed update checks before re-enabling automatic updates.
+5. Run a local Fedora/KDE smoke test.
 
-1. Yapper opens normally.
-2. `window.yapperDesktop` remains present.
-3. `window.yplusplus` exists on the main Yapper page.
-4. `window.yplusplus.getStatus()` reports ready.
-5. External popups and non-Yapper pages do not receive the Y++ bridge.
-6. Restoring the backup returns the original archive byte-for-byte.
-
-
-## Current implementation status
-
-The initial source implementation is committed. The patcher currently targets the verified Yapper 1.2.7 archive structure and writes a separate `yplusplus-preload.cjs` ASAR entry. Automated unit tests, type-check, and build now pass in CI. The real AppImage archive is undergoing a one-time patch/restore integration check before attempting a live graphical launch.
-
-
-The next verification is a one-time headless Electron launch under Xvfb, using Chromium DevTools Protocol to inspect the live renderer and confirm both `window.yplusplus` and the original `window.yapperDesktop` bridge coexist.
-
-
-The live-launch probe initially exposed a CLI dispatch omission (the launcher command was not wired into the command switch); that has been fixed before the next live run.
