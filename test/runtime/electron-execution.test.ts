@@ -212,6 +212,7 @@ test("starts a sandboxed hidden renderer, transfers only its plugin port, and aw
 });
 
 test("refuses plugin execution when Chromium's global sandbox is disabled", async () => {
+  FakeWindow.latest = undefined;
   const directory = await makePluginDirectory();
   try {
     const adapter = createElectronPluginExecutionAdapter(options({ isSandboxDisabled: () => true }));
@@ -259,7 +260,7 @@ test("host abort destroys a renderer that is waiting for its preload handshake",
     for (let attempt = 0; attempt < 20 && !FakeWindow.latest; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
-    const window = FakeWindow.latest;
+    const window = FakeWindow.latest as FakeWindow | undefined;
     assert.ok(window);
     controller.abort();
     await assert.rejects(starting, /renderer exited|cancelled/);
