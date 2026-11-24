@@ -135,6 +135,14 @@ The eventual runtime should execute plugins outside the privileged Electron main
 
 The exact worker technology is intentionally deferred until the manifest and lifecycle contracts are implemented and measured in the target Electron version.
 
+### RPC protocol foundation
+
+`src/runtime/protocol.ts` defines protocol generation 1 and a strict request/response envelope. The initial allowlisted method is `capabilities.notifications.show`; arbitrary method names and extra envelope/payload fields are rejected. Incoming messages are copied into frozen plain data, with a 16 KiB encoded-size ceiling, bounded nesting/node count, strict request IDs, and accessor/symbol/non-JSON data rejection.
+
+`src/runtime/rpc-session.ts` dispatches one authenticated plugin session's requests through a capability facade. It enforces a bounded in-flight count, a finite request timeout, duplicate-ID rejection, and a 4096-request session budget. Errors returned to plugins are generic and do not leak host adapter details. A timed-out operation retains its concurrency slot until the underlying operation actually settles; a timeout does not pretend to cancel a host side effect.
+
+This remains a transport-neutral dispatcher. It does not create a Worker, MessagePort, Electron IPC channel, or execute plugin code. The future runtime must bind each session to a host-verified plugin identity and must never accept an identity supplied in the RPC payload.
+
 ## Implemented package boundaries
 
 - `src/plugins/manifest.ts`: manifest types and pure validation.
@@ -146,12 +154,13 @@ The exact worker technology is intentionally deferred until the manifest and lif
 - `src/capabilities/registry.ts`: capability catalog and pure grant-decision policy.
 - `src/capabilities/broker.ts`: least-privilege notification facade with per-call approval checks and bounded payload validation.
 - `src/capabilities/approval-store.ts`: persistent, version-scoped approval decisions with fail-closed validation and revocation.
+- `src/runtime/protocol.ts`: strict, bounded, versioned RPC envelopes and payload parsing.
+- `src/runtime/rpc-session.ts`: transport-neutral host dispatcher with concurrency limits, timeouts, and duplicate-request protection.
 
 ## Planned package boundaries
 
-- `src/runtime/`: isolated plugin execution adapter and bounded RPC transport.
+- `src/runtime/`: isolated plugin execution adapter, worker/MessagePort transport, and session lifecycle.
 - A concrete Electron notification adapter and host UI integration.
-- `src/runtime/`: isolated plugin execution adapter.
 - Developer tooling, sample plugin, diagnostics, and UI.
 
 These are conceptual boundaries, not a promise that every planned module exists today.
@@ -165,7 +174,7 @@ These are conceptual boundaries, not a promise that every planned module exists 
 5. Plugin API compatibility policy. (Implemented.)
 6. Plugin manager inspection/orchestration through READY. (Implemented; approval provider is injected.)
 7. Persistent approval storage and host approval/revocation workflow. (Implemented; UI remains.)
-8. Sandboxed execution adapter and narrow RPC (broker facade foundation implemented; transport remains).
+8. Sandboxed execution adapter and narrow RPC (protocol and transport-neutral dispatcher implemented; worker transport remains).
 9. Developer tooling, sample plugin, diagnostics, and UI.
 
 The current Y++ BOOT patcher and preload remain independent of this plugin subsystem. Plugin work must not destabilize the verified Yapper 1.2.7 integration.
