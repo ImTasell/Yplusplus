@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { inspectAppDir, patchAppDir, restoreAppDir } from "./patcher.js";
+import { launchAppDir } from "./launcher.js";
 
 function usage(): never {
   console.error(`Y++ BOOT 0.1.0
