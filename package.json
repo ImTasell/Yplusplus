@@ -16,7 +16,8 @@
     "launch": "tsx src/cli.ts launch",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "build": "tsc"
+    "build": "tsc",
+    "install-managed": "npm run build && node dist/cli.js install"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
