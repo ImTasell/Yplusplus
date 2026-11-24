@@ -58,11 +58,10 @@ export class PluginRpcSession {
     if (this.#seenRequestIds.has(request.requestId)) {
       return rpcFailure(request.requestId, "INVALID_MESSAGE", "Duplicate request ID.");
     }
-    this.#seenRequestIds.add(request.requestId);
-    if (this.#seenRequestIds.size > 4096) {
-      const oldest = this.#seenRequestIds.values().next().value as string | undefined;
-      if (oldest !== undefined) this.#seenRequestIds.delete(oldest);
+    if (this.#seenRequestIds.size >= 4096) {
+      return rpcFailure(request.requestId, "RATE_LIMITED", "RPC session request budget exhausted; create a new session.");
     }
+    this.#seenRequestIds.add(request.requestId);
 
     if (this.#inFlight >= this.#maxConcurrent) {
       return rpcFailure(request.requestId, "RATE_LIMITED", "Too many concurrent plugin requests.");
@@ -75,8 +74,10 @@ export class PluginRpcSession {
 
     this.#inFlight += 1;
     let timeout: ReturnType<typeof setTimeout> | undefined;
+    const operation = Promise.resolve()
+      .then(() => show(request.payload))
+      .finally(() => { this.#inFlight -= 1; });
     try {
-      const operation = Promise.resolve().then(() => show(request.payload));
       const timedOut = new Promise<never>((_, reject) => {
         timeout = setTimeout(() => reject(new Error("RPC request timed out.")), this.#timeoutMs);
       });
@@ -93,7 +94,6 @@ export class PluginRpcSession {
       return rpcFailure(request.requestId, "INTERNAL_ERROR", "Capability operation failed.");
     } finally {
       if (timeout !== undefined) clearTimeout(timeout);
-      this.#inFlight -= 1;
     }
   }
 }
