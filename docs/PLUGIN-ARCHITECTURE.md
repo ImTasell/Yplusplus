@@ -4,7 +4,7 @@ Status: **Accepted foundation; implementation in progress**
 Target runtime line: **Y++ 0.x**  
 Current bootstrap: **Y++ BOOT 0.1.0**
 
-This document defines the first stable boundary between plugin authors and the Y++ host. It is deliberately narrower than the eventual framework: manifests, discovery, compatibility, and lifecycle contracts come first; executable plugin loading, workers, UI, and privileged adapters are separate milestones.
+This document defines the first stable boundary between plugin authors and the Y++ host. It records the implemented manifest, discovery, approval, RPC, and sandboxed Electron execution foundations, while distinguishing those foundations from the remaining live Yapper integration, UI, and developer tooling.
 
 ## Design goals
 
@@ -84,7 +84,7 @@ No capability is implemented or granted by this RFC. Unknown capability identifi
 
 Authorization is checked again on every call, so revoking a grant blocks subsequent calls without relying on a stale manager snapshot. Notification payloads are normalized and bounded (title 1–80 characters, message 1–500); extra keys, missing values, and accessor properties are rejected. The broker receives a trusted notification adapter from the host and does not import Electron or expose Node APIs.
 
-This is a broker/facade foundation, not yet a running plugin runtime: no plugin code is loaded, and no concrete Electron notification adapter or renderer-to-host RPC transport is wired up. The facade must remain host-controlled and must never be passed to untrusted plugin code until the isolated runtime boundary is implemented.
+The broker is connected to the RPC foundation and can re-check approval on every operation. The sandboxed Electron execution adapter now provides the isolated renderer boundary, but a live Yapper host factory and concrete native-notification adapter are still required before this capability is usable in the desktop app.
 
 ### Persistent approval store
 
@@ -159,17 +159,17 @@ The adapter is not yet wired into Yapper's live main-process lifecycle, and the 
 
 ### Plugin-side API client and end-to-end RPC
 
-`src/runtime/client.ts` provides the plugin-facing `createPluginApiClient(port)` API. It exposes only `notifications.show({ title, message })`, uses generated request IDs, bounds pending calls, applies per-call timeouts, maps host errors to `PluginApiError`, and rejects outstanding calls when the client closes. It has no Node or Electron imports and is intended to be bundled into the sandbox renderer. The host still validates every request and rechecks persistent approval through the capability broker.
+`src/runtime/client.ts` provides the plugin-facing `createPluginApiClient(port)` API for tests and non-Electron adapters. The production preload currently implements the same narrow `notifications.show({ title, message })` contract directly so it can remain a small sandbox-compatible CommonJS file. Both paths use bounded pending calls and timeouts; the host validates every request and rechecks persistent approval through the capability broker.
 
 `test/runtime/integration.test.ts` exercises the complete in-process path: plugin API client → MessagePort → host RPC session → capability broker → trusted notification adapter. It also verifies that revoking approval blocks subsequent calls without reconnecting. This proves the RPC/capability path, not the Electron sandbox or a real desktop notification.
 
-A minimal example manifest and entry live in `examples/notification-plugin/`. The entry expects the future sandbox adapter to install the frozen `globalThis.yplusplus` API before calling its exported `activate()` function. It is an API example, not yet a loadable/installable plugin until the Electron execution adapter and entry loader land.
+A minimal example manifest and self-contained ESM entry live in `examples/notification-plugin/`. The entry expects the preload to install the frozen `globalThis.yplusplus` API before the adapter calls its exported `activate()` function. The adapter can execute this entry when supplied a READY plugin snapshot and a host-created Electron MessagePort channel; automatic installation, approval UI, and live Yapper host wiring remain separate work.
 
 ### Runtime host coordinator
 
 `src/runtime/host.ts` coordinates one runtime instance per plugin ID. It accepts only compatible plugins in READY, creates a channel and capability-backed RPC session through host-injected factories, transfers the plugin endpoint to an injected execution adapter, and marks the plugin ACTIVE only after adapter startup resolves. Startup is bounded by a configurable timeout; failures and unexpected exits move the runtime to FAILED, close both channel endpoints, and terminate the execution handle. Explicit unload revokes the channel and terminates the worker before reaching UNLOADED. A failed instance may be unloaded and then started again as a fresh instance.
 
-The execution adapter is deliberately injected: the coordinator does not silently choose Node `worker_threads` as a sandbox. Node workers have access to Node APIs and are **not** a security boundary for hostile third-party code. A production adapter must use an execution environment with an explicit security model (for example, a sandboxed Electron renderer with Node integration disabled and context isolation enabled), and must transfer only the plugin-side MessagePort. This coordinator is lifecycle/fault-containment plumbing, not proof of sandboxing.
+The execution adapter is deliberately injected: the coordinator does not silently choose Node `worker_threads` as a sandbox. Node workers have access to Node APIs and are **not** a security boundary for hostile third-party code. `createElectronPluginExecutionAdapter()` is the current sandboxed Electron implementation; the coordinator still owns lifecycle and fault containment, while the Electron adapter owns renderer isolation, entry loading, and startup handshake.
 
 The transport and client now form a tested end-to-end RPC/capability path. They still do not create an Electron renderer, choose an isolation policy, authenticate an arbitrary caller outside host-owned construction, or execute plugin code. The host must keep the host-side port private, bind exactly one session to each plugin endpoint, and never accept an identity supplied in the RPC payload.
 
@@ -205,6 +205,6 @@ These are conceptual boundaries, not a promise that every planned module exists 
 6. Plugin manager inspection/orchestration through READY. (Implemented; approval provider is injected.)
 7. Persistent approval storage and host approval/revocation workflow. (Implemented; UI remains.)
 8. Sandboxed execution adapter and narrow RPC (protocol, session dispatcher, plugin client, MessagePort transport, Electron MessagePortMain adapter, runtime coordinator, and injectable sandboxed BrowserWindow adapter implemented; live Yapper main-process wiring and native notification adapter remain).
-9. Developer tooling, diagnostics, and UI. (A minimal API example exists; it is not loadable until the execution adapter lands.)
+9. Developer tooling, diagnostics, and UI. (The example entry can be executed by the injected Electron adapter; automatic plugin installation, user-facing approval, and management UI remain.)
 
 The current Y++ BOOT patcher and preload remain independent of this plugin subsystem. Plugin work must not destabilize the verified Yapper 1.2.7 integration.
