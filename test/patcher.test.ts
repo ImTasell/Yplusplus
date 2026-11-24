@@ -41,6 +41,9 @@ test("patches the known Yapper anchor and adds a separate preload", () => {
 
   assert.ok(main.includes(PATCH_MARKER));
   assert.ok(main.includes("registerPreloadScript"));
+  assert.ok(main.includes("YPLUSPLUS_RUNTIME_ENTRY"));
+  assert.ok(main.includes("startYplusplusMain"));
+  assert.ok(main.includes("pathToFileURL"));
   for (const pattern of [
     "https://www.yapper.website/*",
     "https://yapper.website/*",
