@@ -141,7 +141,9 @@ The exact worker technology is intentionally deferred until the manifest and lif
 
 `src/runtime/rpc-session.ts` dispatches one authenticated plugin session's requests through a capability facade. It enforces a bounded in-flight count, a finite request timeout, duplicate-ID rejection, and a 4096-request session budget. Errors returned to plugins are generic and do not leak host adapter details. A timed-out operation retains its concurrency slot until the underlying operation actually settles; a timeout does not pretend to cancel a host side effect.
 
-This remains a transport-neutral dispatcher. It does not create a Worker, MessagePort, Electron IPC channel, or execute plugin code. The future runtime must bind each session to a host-verified plugin identity and must never accept an identity supplied in the RPC payload.
+The transport adapter in `src/runtime/message-port.ts` now binds a `PluginRpcSession` to a standard MessagePort-like endpoint. It starts the port, dispatches each received message through that session, posts the bounded RPC response, and suppresses late replies after transport closure. The adapter accepts no plugin identity; the host must create the port pair and bind the session using trusted discovery/approval state before handing the other endpoint to a plugin runtime.
+
+This is a MessagePort transport foundation, not yet a complete sandbox. It does not create a Worker, choose an isolation policy, authenticate an arbitrary caller, or execute plugin code. The host must keep the host-side port private, bind exactly one session to each plugin endpoint, and never accept an identity supplied in the RPC payload.
 
 ## Implemented package boundaries
 
@@ -155,7 +157,7 @@ This remains a transport-neutral dispatcher. It does not create a Worker, Messag
 - `src/capabilities/broker.ts`: least-privilege notification facade with per-call approval checks and bounded payload validation.
 - `src/capabilities/approval-store.ts`: persistent, version-scoped approval decisions with fail-closed validation and revocation.
 - `src/runtime/protocol.ts`: strict, bounded, versioned RPC envelopes and payload parsing.
-- `src/runtime/rpc-session.ts`: transport-neutral host dispatcher with concurrency limits, timeouts, and duplicate-request protection.
+- `src/runtime/rpc-session.ts`: host dispatcher with concurrency limits, timeouts, and duplicate-request protection.\n- `src/runtime/message-port.ts`: MessagePort transport adapter for one host-bound RPC session.
 
 ## Planned package boundaries
 
