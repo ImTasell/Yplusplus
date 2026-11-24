@@ -105,7 +105,15 @@ export class PluginRuntimeHost {
     }
 
     const channel = this.#options.createChannel();
-    const transport = bindRpcMessagePort(channel.hostPort, this.#options.createSession(plugin));
+    let transport: RpcPortTransport;
+    try {
+      const session = this.#options.createSession(plugin);
+      transport = bindRpcMessagePort(channel.hostPort, session);
+    } catch (error) {
+      channel.hostPort.close();
+      channel.pluginPort.close();
+      throw error;
+    }
     const record: RuntimeRecord = {
       plugin,
       state: "READY",
