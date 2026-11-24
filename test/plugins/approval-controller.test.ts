@@ -45,6 +45,15 @@ test("new plugins wait for explicit trust, even when they request no capabilitie
   assert.equal(report.counts.waitingForTrust, 1);
 });
 
+test("an explicitly trusted zero-permission plugin becomes READY", async () => {
+  const { discovery, plugin, controller } = await setup(manifest({ permissions: [] }));
+  await controller.trust(plugin);
+  const report = await controller.inspect(discovery);
+  assert.equal(report.plugins[0]?.state, "READY");
+  assert.equal(report.plugins[0]?.trusted, true);
+  assert.deepEqual(report.plugins[0]?.approvedPermissions, []);
+});
+
 test("trusting a release persists execution trust but grants no capabilities", async () => {
   const { discovery, plugin, controller, store, trustStore } = await setup(manifest());
   await controller.trust(plugin);
