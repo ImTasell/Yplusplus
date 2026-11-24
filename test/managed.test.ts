@@ -76,8 +76,10 @@ function makeRuntimeSource(dir: string): void {
   ]) {
     writeFileSync(join(dir, file), "// runtime fixture\n");
   }
-  mkdirSync(join(dir, "src", "runtime"), { recursive: true });
-  writeFileSync(join(dir, "src", "runtime", "bootstrap.js"), "// bootstrap fixture\n");
+  mkdirSync(join(dir, "runtime"), { recursive: true });
+  writeFileSync(join(dir, "runtime", "bootstrap.js"), "// bootstrap fixture\n");
+  mkdirSync(join(dir, "runtime", "assets"), { recursive: true });
+  writeFileSync(join(dir, "runtime", "assets", "plugin-host.html"), "<html></html>");
 }
 
 test("managed paths follow XDG_DATA_HOME and fall back to the user data directory", () => {
@@ -100,15 +102,15 @@ test("desktop entry safely quotes executable and managed paths", () => {
   assert.ok(entry.includes('Exec="/home/test/.nvm/bin/node"'));
   assert.ok(entry.includes('"launch"'));
   assert.ok(entry.includes('"/home/test/.local/share/yplusplus/versions/Yapper App"'));
-  assert.equal(quoteDesktopArg("/tmp/100%"), '"/tmp/100%%"');
-  assert.equal(quoteDesktopArg('/tmp/a "quoted" path'), '"/tmp/a \\"quoted\\" path"');
+  assert.equal(quoteDesktopArg("/tmp/100%"), '" /tmp/100%%"'.replace('" ', '"'));
+  assert.equal(quoteDesktopArg('/tmp/a "quoted" path'), '" /tmp/a \\"quoted\\" path"'.replace('" ', '"'));
 });
 
 test("managed install patches atomically, installs its runtime and desktop entry, and is idempotent", () => {
   const root = mkdtempSync(join(tmpdir(), "yplusplus-managed-test-"));
   const extracted = join(root, "squashfs-root");
   const secondExtracted = join(root, "second-squashfs-root");
-  const runtimeSource = join(root, "dist");
+  const runtimeSource = join(root, "dist", "src");
   const dataHome = join(root, "user data", ".local", "share");
   const nodeExecutable = "/usr/bin/node";
   mkdirSync(extracted, { recursive: true });
@@ -130,7 +132,8 @@ test("managed install patches atomically, installs its runtime and desktop entry
     assert.equal(inspectAppDir(first.appDir).patched, true);
     assert.equal(existsSync(first.appDir + "/resources/app.asar.yplusplus-original"), true);
     assert.equal(existsSync(join(first.runtimeDir, "cli.js")), true);
-    assert.equal(existsSync(join(first.runtimeDir, "src", "runtime", "bootstrap.js")), true);
+    assert.equal(existsSync(join(first.runtimeDir, "runtime", "bootstrap.js")), true);
+    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-host.html")), true);
     assert.equal(JSON.parse(readFileSync(join(first.runtimeDir, "package.json"), "utf8")).type, "module");
 
     const desktop = readFileSync(first.desktopFile, "utf8");
@@ -157,7 +160,7 @@ test("same-version AppImage payload changes are rejected instead of silently reu
   const root = mkdtempSync(join(tmpdir(), "yplusplus-managed-version-collision-"));
   const firstExtracted = join(root, "first");
   const secondExtracted = join(root, "second");
-  const runtimeSource = join(root, "dist");
+  const runtimeSource = join(root, "dist", "src");
   const dataHome = join(root, "data");
   mkdirSync(firstExtracted, { recursive: true });
   mkdirSync(secondExtracted, { recursive: true });
@@ -182,7 +185,7 @@ test("AppImage install invokes the extractor without modifying the source file",
   const root = mkdtempSync(join(tmpdir(), "yplusplus-appimage-extract-test-"));
   const sourceAppDir = join(root, "source-appdir");
   const fakeAppImage = join(root, "fake.AppImage");
-  const runtimeSource = join(root, "dist");
+  const runtimeSource = join(root, "dist", "src");
   const dataHome = join(root, "data");
   mkdirSync(sourceAppDir, { recursive: true });
   makeAppDir(sourceAppDir);
