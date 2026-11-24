@@ -2,8 +2,7 @@
  * Y++ main-process bootstrap for the managed Yapper installation.
  *
  * This module is dynamically imported by the version-specific BOOT patch.
- * It owns discovery, persistent execution trust, capability approvals,
- * runtime startup, and shutdown.
+ * It owns discovery, trust, approvals, runtime startup, and manager UI.
  */
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -15,6 +14,8 @@ import {
   isElectronSandboxDisabled,
   type ElectronPluginRuntimeHostOptions,
 } from "./electron-host.js";
+import { PluginManagerService } from "./plugin-manager-service.js";
+import { createPluginManagerWindow, type PluginManagerWindowOptions } from "./plugin-manager-window.js";
 
 export interface YplusplusElectronApp {
   readonly commandLine: { hasSwitch(name: string): boolean };
@@ -25,8 +26,8 @@ export interface YplusplusElectronApp {
 
 export interface YplusplusElectronDependencies {
   readonly app: YplusplusElectronApp;
-  readonly BrowserWindow: ElectronPluginRuntimeHostOptions["BrowserWindow"];
-  readonly ipcMain: ElectronPluginRuntimeHostOptions["ipcMain"];
+  readonly BrowserWindow: ElectronPluginRuntimeHostOptions["BrowserWindow"] & PluginManagerWindowOptions["BrowserWindow"];
+  readonly ipcMain: ElectronPluginRuntimeHostOptions["ipcMain"] & PluginManagerWindowOptions["ipcMain"];
   readonly MessageChannelMain: ElectronPluginRuntimeHostOptions["MessageChannelMain"];
   readonly Notification: ElectronPluginRuntimeHostOptions["Notification"];
 }
@@ -89,21 +90,31 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
   const waitingForTrust = report.plugins
     .filter((plugin) => plugin.state === "WAITING_FOR_TRUST")
     .map((plugin) => plugin.id);
-  for (const plugin of waitingForTrust) {
-    console.info(`[Y++] Plugin awaits explicit trust: ${plugin}`);
-  }
+  for (const plugin of waitingForTrust) console.info(`[Y++] Plugin awaits explicit trust: ${plugin}`);
 
   const waitingForApproval = report.plugins
     .filter((plugin) => plugin.state === "WAITING_FOR_APPROVAL")
     .map((plugin) => plugin.id);
-  for (const plugin of waitingForApproval) {
-    console.info(`[Y++] Plugin awaits permission approval: ${plugin}`);
-  }
+  for (const plugin of waitingForApproval) console.info(`[Y++] Plugin awaits permission approval: ${plugin}`);
   for (const rejected of report.rejected) {
     console.warn("[Y++] Rejected plugin directory:", rejected.directory, rejected.issues);
   }
 
-  const managerService = new PluginManagerService({ pluginRoot, approvals, runtime });\n  const managerWindow = createPluginManagerWindow({\n    BrowserWindow: dependencies.BrowserWindow,\n    ipcMain: dependencies.ipcMain,\n    service: managerService,\n  });\n  if (process.argv.includes("--yplusplus-plugin-manager")) {\n    if (isElectronSandboxDisabled(dependencies.app)) {\n      console.error("[Y++] Plugin Manager was not opened because Chromium sandboxing is disabled.");\n    } else {\n      void managerWindow.open().catch((error) => console.error("[Y++] Plugin Manager failed to open:", error));\n    }\n  }\n\n  let shutdownStarted = false;
+  const managerService = new PluginManagerService({ pluginRoot, approvals, runtime });
+  const managerWindow = createPluginManagerWindow({
+    BrowserWindow: dependencies.BrowserWindow,
+    ipcMain: dependencies.ipcMain,
+    service: managerService,
+  });
+  if (process.argv.includes("--yplusplus-plugin-manager")) {
+    if (isElectronSandboxDisabled(dependencies.app)) {
+      console.error("[Y++] Plugin Manager was not opened because Chromium sandboxing is disabled.");
+    } else {
+      void managerWindow.open().catch((error) => console.error("[Y++] Plugin Manager failed to open:", error));
+    }
+  }
+
+  let shutdownStarted = false;
   let allowQuit = false;
   dependencies.app.on("before-quit", (event) => {
     if (allowQuit) return;
