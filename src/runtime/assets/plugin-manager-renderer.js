@@ -47,14 +47,14 @@ function renderPlugin(plugin) {
   names.append(element("h2", "", plugin.name));
   names.append(element("div", "plugin-id", plugin.id));
   identity.append(names);
-  const runtimeActive = plugin.runtimeState === "ACTIVE";
-  const statusText = runtimeActive ? "ACTIVE" : plugin.state.replaceAll("_", " ");
-  const status = element("span", "state " + String(runtimeActive ? "active" : plugin.state).toLowerCase(), statusText);
+  const active = plugin.runtimeState === "ACTIVE";
+  const status = element("span", "state " + String(active ? "active" : plugin.state).toLowerCase(),
+    active ? "ACTIVE" : plugin.state.replaceAll("_", " "));
   head.append(identity, status);
   card.append(head, element("p", "plugin-desc", "Version " + plugin.version + " · API " + plugin.compatibility.pluginApiVersion));
 
   const permissionArea = element("div");
-  permissionArea.append(element("div", "section-label", "Capabilities"));
+  permissionArea.append(element("div", "section-label", "Capability permissions"));
   const permissionList = element("div", "permissions");
   if (!plugin.requestedPermissions.length) {
     permissionList.append(element("div", "permission", "This plugin requests no capabilities."));
@@ -62,9 +62,19 @@ function renderPlugin(plugin) {
   for (const capability of plugin.requestedPermissions) {
     const denied = plugin.deniedPermissions.find((item) => item.id === capability);
     const approved = plugin.approvedPermissions.includes(capability);
-    const stateText = approved ? "Approved" : denied?.reason === "unsupported" ? "Unsupported by host" : "Not approved";
     const row = element("div", "permission");
-    row.append(element("span", "permission-name", capability), element("span", "permission-state", stateText));
+    const label = element("span", "permission-name", capability);
+    const controls = element("div", "permission-controls");
+    const stateText = approved ? "Approved" : denied?.reason === "unsupported" ? "Unsupported" : plugin.trusted ? "Not approved" : "Trust required";
+    controls.append(element("span", "permission-state", stateText));
+    if (denied?.reason !== "unsupported" && plugin.trusted) {
+      if (approved) {
+        controls.append(button("Revoke", () => perform(() => api.revoke(plugin.id, plugin.version, [capability])), "danger"));
+      } else {
+        controls.append(button("Approve", () => perform(() => api.approve(plugin.id, plugin.version, [capability])), "primary"));
+      }
+    }
+    row.append(label, controls);
     permissionList.append(row);
   }
   permissionArea.append(permissionList);
@@ -76,14 +86,7 @@ function renderPlugin(plugin) {
   } else {
     actions.append(button("Revoke trust", () => perform(() => api.untrust(plugin.id, plugin.version)), "danger"));
   }
-  const pending = plugin.deniedPermissions.filter((item) => item.reason === "not-approved").map((item) => item.id);
-  if (plugin.trusted && pending.length) {
-    actions.append(button("Approve requested capabilities", () => perform(() => api.approve(plugin.id, plugin.version, pending)), "primary"));
-  }
-  if (plugin.approvedPermissions.length) {
-    actions.append(button("Revoke all capabilities", () => perform(() => api.revoke(plugin.id, plugin.version)), "danger"));
-  }
-  if (runtimeActive) {
+  if (active) {
     actions.append(button("Stop plugin", () => perform(() => api.unload(plugin.id, plugin.version))));
   } else if (plugin.state === "READY" && plugin.trusted) {
     actions.append(button("Start plugin", () => perform(() => api.start(plugin.id, plugin.version)), "primary"));
@@ -106,7 +109,7 @@ async function refresh() {
   rejectedRoot.replaceChildren();
   rejectedSection.hidden = result.rejected.length === 0;
   for (const item of result.rejected) {
-    rejectedRoot.append(element("div", "rejected-item", item.directory + " — " + item.issues.map((issue) => issue.code).join(", ")));
+    rejectedRoot.append(element("div", "rejected-item", item.directory + " — " + item.issues.map((issue) => issue.code).join(", "));
   }
 }
 
