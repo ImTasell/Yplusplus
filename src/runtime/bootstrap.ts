@@ -35,7 +35,7 @@ export interface YplusplusBootstrapResult {
   readonly discovered: number;
   readonly rejected: number;
   readonly started: readonly string[];
-  readonly waitingForApproval: readonly string[];
+  readonly waitingForTrust: readonly string[];\n  readonly waitingForApproval: readonly string[];
   readonly failed: readonly string[];
 }
 
@@ -85,7 +85,7 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     }
   }
 
-  const waitingForApproval = report.plugins
+  const waitingForTrust = report.plugins\n    .filter((plugin) => plugin.state === "WAITING_FOR_TRUST")\n    .map((plugin) => plugin.id);\n  for (const plugin of waitingForTrust) {\n    console.info(`[Y++] Plugin awaits explicit trust: ${plugin}`);\n  }\n\n  const waitingForApproval = report.plugins
     .filter((plugin) => plugin.state === "WAITING_FOR_APPROVAL")
     .map((plugin) => plugin.id);
   for (const plugin of waitingForApproval) {
