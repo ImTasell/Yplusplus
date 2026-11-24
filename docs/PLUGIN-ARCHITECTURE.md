@@ -161,7 +161,7 @@ This is a MessagePort transport foundation, not yet a complete sandbox. It does 
 
 ## Planned package boundaries
 
-- `src/runtime/`: isolated plugin execution adapter, worker/MessagePort transport, and session lifecycle.
+- `src/runtime/`: isolated plugin execution adapter, Worker creation/policy, and session lifecycle (the MessagePort adapter is implemented).
 - A concrete Electron notification adapter and host UI integration.
 - Developer tooling, sample plugin, diagnostics, and UI.
 
@@ -176,7 +176,7 @@ These are conceptual boundaries, not a promise that every planned module exists 
 5. Plugin API compatibility policy. (Implemented.)
 6. Plugin manager inspection/orchestration through READY. (Implemented; approval provider is injected.)
 7. Persistent approval storage and host approval/revocation workflow. (Implemented; UI remains.)
-8. Sandboxed execution adapter and narrow RPC (protocol and transport-neutral dispatcher implemented; worker transport remains).
+8. Sandboxed execution adapter and narrow RPC (protocol, session dispatcher, and MessagePort adapter implemented; Worker isolation remains).
 9. Developer tooling, sample plugin, diagnostics, and UI.
 
 The current Y++ BOOT patcher and preload remain independent of this plugin subsystem. Plugin work must not destabilize the verified Yapper 1.2.7 integration.
