@@ -147,9 +147,11 @@ One GitHub Actions integration run extracted the captured official 1.2.7 AppImag
 
 ## Remaining verification milestones
 
-Automated regression coverage now exists for origin isolation and document lifecycle behavior (external origins, popup contexts, same-document SPA navigation, same-origin reloads, and fresh-document cross-origin navigation). These tests execute the actual preload source with mocked Electron boundaries; live Chromium popup/navigation testing remains part of the final desktop smoke test.
+Completed:
+- Origin isolation and document lifecycle regression coverage.
+- Managed AppImage installation, versioned AppDir storage, a self-contained Y++ runtime, and a generated desktop launcher.
 
-1. Build a managed installation path and desktop launcher that can safely reapply patches after Yapper updates.
-2. Implement Y++-managed update checks before re-enabling automatic updates.
-3. Run a local Fedora/KDE smoke test.
+Remaining:
+1. Implement Y++-managed update checks before re-enabling automatic updates.
+2. Run a local Fedora/KDE smoke test, including live OAuth popup/navigation behavior.
 
