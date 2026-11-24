@@ -99,11 +99,11 @@ One GitHub Actions integration run extracted the captured official 1.2.7 AppImag
 
 ## Known limitations
 
-- The real AppImage archive patch/restore path and ASAR integrity metadata have been verified in GitHub Actions; this does not yet prove the preload executes inside a live Yapper window.
+- The real AppImage archive patch/restore path and live renderer bridge have been verified on an Ubuntu Xvfb runner; Fedora/KDE desktop behavior still needs a local smoke test.
 - The preload script is a self-contained sandbox-compatible CommonJS file.
-- Live graphical preload execution has not yet been validated.
+- Yapper's built-in AppImage updater is intentionally inactive under the Y++ launcher. Y++ update management is not implemented yet.
 - A successful patch is not a guarantee of compatibility with any Yapper version other than 1.2.7.
-- The session registration API does not rerun for in-page navigations; the preload is injected for each matching document navigation.
+- The session registration API does not rerun for in-page navigations; it runs on matching document navigations.
 - The Y++ API is not a plugin security sandbox. Plugin execution and capability brokering are future milestones.
 
 ## Next verification step
