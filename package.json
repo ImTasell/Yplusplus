@@ -9,16 +9,17 @@
     "node": ">=20.11"
   },
   "scripts": {
-    "dev": "node --experimental-strip-types src/cli.ts",
+    "dev": "tsx src/cli.ts",
     "inspect": "node --experimental-strip-types src/cli.ts inspect",
     "patch": "node --experimental-strip-types src/cli.ts patch",
     "restore": "node --experimental-strip-types src/cli.ts restore",
-    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
+    "tsx": "^4.19.2",
     "typescript": "^5.8.3"
   }
 }
