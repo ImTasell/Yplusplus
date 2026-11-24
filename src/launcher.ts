@@ -2,6 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { delimiter, join, resolve } from "node:path";
 import { inspectAppDir } from "./patcher.js";
+import { managedPaths, YPLUSPLUS_RUNTIME_VERSION } from "./managed.js";
 
 export function buildLaunchEnvironment(appDir: string, inherited: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const root = resolve(appDir);
@@ -13,6 +14,10 @@ export function buildLaunchEnvironment(appDir: string, inherited: NodeJS.Process
   delete env.APPIMAGE;
 
   env.APPDIR = root;
+  const paths = managedPaths(inherited);
+  const runtimeDir = join(paths.runtimeParent, YPLUSPLUS_RUNTIME_VERSION);
+  env.YPLUSPLUS_RUNTIME_ENTRY = join(runtimeDir, "src", "runtime", "bootstrap.js");
+  env.YPLUSPLUS_PLUGIN_DIR = join(paths.managedRoot, "plugins");
   env.PATH = [root, join(root, "usr", "sbin"), inherited.PATH].filter(Boolean).join(delimiter);
   env.XDG_DATA_DIRS = [
     join(root, "usr", "share"),
