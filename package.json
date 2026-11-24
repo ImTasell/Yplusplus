@@ -1,0 +1,24 @@
+{
+  "name": "@yplusplus/bootstrap",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Y++ BOOT - experimental Yapper Desktop bootstrap and preload patcher",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "dev": "node --experimental-strip-types src/cli.ts",
+    "inspect": "node --experimental-strip-types src/cli.ts inspect",
+    "patch": "node --experimental-strip-types src/cli.ts patch",
+    "restore": "node --experimental-strip-types src/cli.ts restore",
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "typescript": "^5.8.3"
+  }
+}
