@@ -255,7 +255,9 @@ test("host abort destroys a renderer that is waiting for its preload handshake",
       new ElectronMessagePortAdapter(new FakeNativePort()),
       controller.signal,
     );
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    for (let attempt = 0; attempt < 20 && !FakeWindow.latest; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
     const window = FakeWindow.latest;
     assert.ok(window);
     controller.abort();
