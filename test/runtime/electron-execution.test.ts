@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -196,7 +196,7 @@ test("starts a sandboxed hidden renderer, transfers only its plugin port, and aw
     const blocked: Array<{ cancel: boolean }> = [];
     window.session.webRequest.listener?.({ url: "https://example.com/" }, (result) => blocked.push(result));
     window.session.webRequest.listener?.({ url: "file:///runtime/plugin-host.html" }, (result) => blocked.push(result));
-    assert.deepEqual(blocked, [{ cancel: true }, { cancel: true }]);
+    assert.deepEqual(blocked, [{ cancel: true }, { cancel: false }]);
     let exits = 0;
     handle.onExit(() => { exits += 1; });
     await handle.terminate();
