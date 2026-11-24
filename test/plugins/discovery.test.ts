@@ -26,7 +26,7 @@ async function addPlugin(root: string, folder: string, value: unknown): Promise<
   await writeFile(path.join(directory, "dist", "index.js"), "export {};", "utf8");
   await writeFile(
     path.join(directory, "yplusplus.plugin.json"),
-    JSON.stringify(value),
+    JSON.stringify(value) ?? "null",
     "utf8",
   );
   return directory;
