@@ -72,16 +72,17 @@ function makeRuntimeSource(dir: string): void {
     "patcher.js",
     "asar.js",
     "preload-source.js",
-    "updater.js",
-    "runtime/plugin-manager-service.js",
-    "runtime/plugin-manager-window.js"
+    "updater.js"
   ]) {
     writeFileSync(join(dir, file), "// runtime fixture\n");
   }
-  mkdirSync(join(dir, "runtime"), { recursive: true });
-  writeFileSync(join(dir, "runtime", "bootstrap.js"), "// bootstrap fixture\n");\n  writeFileSync(join(dir, "runtime", "plugin-manager-service.js"), "// manager service fixture\n");\n  writeFileSync(join(dir, "runtime", "plugin-manager-window.js"), "// manager window fixture\n");
   mkdirSync(join(dir, "runtime", "assets"), { recursive: true });
-  for (const file of ["plugin-host.html", "plugin-manager.html", "plugin-manager.css", "plugin-manager-renderer.js", "plugin-manager-preload.cjs", "plugin-preload.cjs"]) {\n    writeFileSync(join(dir, "runtime", "assets", file), "/* asset fixture */");\n  }
+  for (const file of ["bootstrap.js", "plugin-manager-service.js", "plugin-manager-window.js"]) {
+    writeFileSync(join(dir, "runtime", file), "// runtime fixture\n");
+  }
+  for (const file of ["plugin-host.html", "plugin-manager.html", "plugin-manager.css", "plugin-manager-renderer.js", "plugin-manager-preload.cjs", "plugin-preload.cjs"]) {
+    writeFileSync(join(dir, "runtime", "assets", file), "/* asset fixture */");
+  }
 }
 
 test("managed paths follow XDG_DATA_HOME and fall back to the user data directory", () => {
