@@ -75,3 +75,27 @@ test("refuses to overwrite an unrecognized preload entry", () => {
   };
   assert.throws(() => patchAsarBuffer(encodeAsar(archive.header, archive.data)), /without a recognized Y\+\+ patch marker/);
 });
+
+test("AppDir patch creates a backup and restore returns the exact original archive", async () => {
+  const { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { patchAppDir, restoreAppDir } = await import("../src/patcher.js");
+
+  const appDir = mkdtempSync(join(tmpdir(), "yplusplus-boot-test-"));
+  const resources = join(appDir, "resources");
+  mkdirSync(resources, { recursive: true });
+  const archivePath = join(resources, "app.asar");
+  const original = makeYapperArchive();
+  writeFileSync(archivePath, original);
+
+  try {
+    assert.equal(patchAppDir(appDir).status, "patched");
+    assert.equal(patchAppDir(appDir).status, "already-patched");
+    assert.notDeepEqual(readFileSync(archivePath), original);
+    restoreAppDir(appDir);
+    assert.deepEqual(readFileSync(archivePath), original);
+  } finally {
+    rmSync(appDir, { recursive: true, force: true });
+  }
+});
