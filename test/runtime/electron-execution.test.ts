@@ -26,6 +26,7 @@ class FakeNativePort implements ElectronMessagePortMainLike {
 
 class FakeIpcMain {
   readonly listeners = new Map<string, (event: any, ...args: unknown[]) => void>();
+  suppressBridgeReady = false;
   on(channel: string, listener: (event: any, ...args: unknown[]) => void): void {
     this.listeners.set(channel, listener);
   }
@@ -33,6 +34,7 @@ class FakeIpcMain {
     if (this.listeners.get(channel) === listener) this.listeners.delete(channel);
   }
   emit(channel: string, event: any, ...args: unknown[]): void {
+    if (this.suppressBridgeReady && channel === "yplusplus:plugin-bridge-ready") return;
     this.listeners.get(channel)?.(event, ...args);
   }
 }
@@ -236,6 +238,31 @@ test("does not read or create a renderer after host cancellation", async () => {
     );
     assert.equal(FakeWindow.latest, undefined);
   } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+
+test("host abort destroys a renderer that is waiting for its preload handshake", async () => {
+  FakeWindow.latest = undefined;
+  ipc.suppressBridgeReady = true;
+  const directory = await makePluginDirectory();
+  const controller = new AbortController();
+  try {
+    const adapter = createElectronPluginExecutionAdapter(options());
+    const starting = adapter.start(
+      { ...fixture(), directory },
+      new ElectronMessagePortAdapter(new FakeNativePort()),
+      controller.signal,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const window = FakeWindow.latest;
+    assert.ok(window);
+    controller.abort();
+    await assert.rejects(starting, /renderer exited|cancelled/);
+    assert.equal(window.destroyed, true);
+  } finally {
+    ipc.suppressBridgeReady = false;
     await rm(directory, { recursive: true, force: true });
   }
 });
