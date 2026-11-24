@@ -9,7 +9,8 @@ import {
   rmSync,
   readFileSync,
   statSync,
-  writeFileSync
+  writeFileSync,
+  unlinkSync
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -215,6 +216,13 @@ export function installExtractedAppDir(
   const cliPath = join(runtimeDir, "cli.js");
   const desktopFile = join(applicationsDir, "yplusplus-yapin.desktop");
   writeFileAtomically(desktopFile, renderDesktopEntry(nodeExecutable, cliPath, appDir));
+  const legacyDesktopFile = join(applicationsDir, "yplusplus-yapper.desktop");
+  if (existsSync(legacyDesktopFile)) {
+    const legacyContents = readFileSync(legacyDesktopFile, "utf8");
+    if (legacyContents.includes("Name=Yapper (Y++)") && legacyContents.includes("yplusplus")) {
+      unlinkSync(legacyDesktopFile);
+    }
+  }
 
   return { status, version: inspected.version, appDir, desktopFile, runtimeDir };
 }
