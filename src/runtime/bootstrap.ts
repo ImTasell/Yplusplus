@@ -49,7 +49,10 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
   await dependencies.app.whenReady();
 
   const root = join(dataHome(), "yplusplus");
-  const pluginRoot = join(root, "plugins");
+  const configuredPluginRoot = process.env.YPLUSPLUS_PLUGIN_DIR;
+  const pluginRoot = configuredPluginRoot && isAbsolute(configuredPluginRoot)
+    ? resolve(configuredPluginRoot)
+    : join(root, "plugins");
   await mkdir(pluginRoot, { recursive: true, mode: 0o700 });
 
   const discovery = await discoverPlugins(pluginRoot);
@@ -88,14 +91,27 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     console.warn("[Y++] Rejected plugin directory:", rejected.directory, rejected.issues);
   }
 
-  let quitting = false;
+  let shutdownStarted = false;
+  let allowQuit = false;
   dependencies.app.on("before-quit", (event) => {
-    if (quitting) return;
-    quitting = true;
+    if (allowQuit) return;
+    // Electron may emit before-quit more than once. Keep preventing exit until
+    // every runtime has finished teardown, even if another quit is requested.
     event.preventDefault();
-    void Promise.all(runtime.list().map((item) => runtime.unload(item.id)))
-      .catch((error: unknown) => console.error("[Y++] Runtime shutdown error:", error))
-      .finally(() => dependencies.app.quit());
+    if (shutdownStarted) return;
+    shutdownStarted = true;
+    void Promise.allSettled(runtime.list().map((item) => runtime.unload(item.id)))
+      .then((results) => {
+        for (const result of results) {
+          if (result.status === "rejected") {
+            console.error("[Y++] Runtime shutdown error:", result.reason);
+          }
+        }
+      })
+      .finally(() => {
+        allowQuit = true;
+        dependencies.app.quit();
+      });
   });
 
   const result = Object.freeze({
