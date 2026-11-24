@@ -30,7 +30,8 @@ test("ASAR encoder and parser round-trip file data", () => {
 
 test("ASAR reader rejects data that fails its integrity hash", () => {
   const buffer = fixtureArchive();
-  buffer[buffer.length - 1] ^= 0xff;
+  const lastIndex = buffer.length - 1;
+  buffer[lastIndex] = buffer[lastIndex]! ^ 0xff;
   const archive = parseAsar(buffer);
   assert.throws(() => readAsarFile(archive, "payload.txt"), /integrity check failed/);
 });
