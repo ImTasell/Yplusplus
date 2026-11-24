@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { PluginApprovalController } from "./plugins/approval-controller.js";
@@ -40,6 +41,7 @@ async function managePlugins(action: string | undefined, args: string[]): Promis
   const pluginRoot = configuredRoot && isAbsolute(configuredRoot)
     ? resolve(configuredRoot)
     : join(dataHome, "yplusplus", "plugins");
+  await mkdir(pluginRoot, { recursive: true, mode: 0o700 });
   const discovery = await discoverPlugins(pluginRoot);
   const controller = new PluginApprovalController();
 
