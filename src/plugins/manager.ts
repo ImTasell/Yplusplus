@@ -80,9 +80,9 @@ async function inspectDiscoveredPlugin(plugin: DiscoveredPlugin, options: Plugin
     });
   }
 
+  state = advance(state, "WAITING_FOR_TRUST");
   const trusted = await options.isTrusted(plugin.manifest.id, plugin.manifest.version);
   if (!trusted) {
-    state = advance(state, "WAITING_FOR_TRUST");
     return Object.freeze({
       ...base, state, trusted: false,
       approvedPermissions: Object.freeze([]),
