@@ -45,7 +45,7 @@ class TestPort implements RpcMessagePort {
   postMessage(_message: unknown): void {}
   addEventListener(_type: "message", listener: (event: { readonly data: unknown }) => void): void { this.#listener = listener; }
   removeEventListener(_type: "message", listener: (event: { readonly data: unknown }) => void): void {
-    if (this.#listener === listener) delete this.#listener;
+    if (this.#listener === listener) this.#listener = undefined;
   }
   start(): void {}
   close(): void { this.closed = true; }
