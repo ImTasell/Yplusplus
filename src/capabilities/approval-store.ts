@@ -166,6 +166,7 @@ export class PluginApprovalStore {
 
   async getApprovedPermissions(pluginId: string, pluginVersion: string): Promise<ReadonlySet<string>> {
     validateIdentity(pluginId, pluginVersion);
+    await this.queue;
     const document = await this.readDocument();
     const record = document.records.find((item) =>
       item.pluginId === pluginId && item.pluginVersion === pluginVersion);
