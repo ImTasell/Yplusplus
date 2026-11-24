@@ -103,7 +103,7 @@ node ~/.local/share/yplusplus/runtime/0.1.4/cli.js plugins trust dev.example.plu
 node ~/.local/share/yplusplus/runtime/0.1.4/cli.js plugins approve dev.example.plugin 1.0.0 ui.notifications
 ```
 
-Trust and capability grants are persisted separately under `$XDG_CONFIG_HOME/yplusplus/` (or `~/.config/yplusplus/`).
+Trust and capability grants are persisted separately under `$XDG_CONFIG_HOME/yplusplus/` (or `~/.config/yplusplus/`). CLI trust revocation prevents the release from starting on the next launch; it does not yet terminate a renderer that is already running. Capability revocation is checked by the broker on each operation.
 
 ## Lifecycle contract
 
