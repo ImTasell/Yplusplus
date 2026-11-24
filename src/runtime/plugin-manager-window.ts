@@ -10,7 +10,7 @@ interface ManagerSession {
     ): void;
   };
   setPermissionRequestHandler(handler: ((_contents: unknown, _permission: string, callback: (allowed: boolean) => void) => void) | null): void;
-  setPermissionCheckHandler(handler: (() => boolean) | null): void;
+  setPermissionCheckHandler(handler: ((...args: any[]) => boolean) | null): void;
 }
 interface ManagerWebContents {
   readonly mainFrame: unknown;
