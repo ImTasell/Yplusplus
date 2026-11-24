@@ -84,14 +84,13 @@ No capability is implemented or granted by this RFC. Unknown capability identifi
 
 The store supports per-capability revocation, release-wide revocation, and plugin-wide revocation. Writes are serialized within the process, staged in the same directory, and atomically renamed. The containing directory is set to mode `0700`; the file is written as `0600`. Symlink/non-regular-file targets, broad file permissions, malformed JSON, unknown schema fields, duplicate records, and invalid values fail closed. This is host-side persistence only; it does not itself decide whether a capability exists or is safe to grant.
 
-The manager can consume the store as its trusted approval provider:
+The host approval workflow is implemented by `src/plugins/approval-controller.ts`. The controller owns the store, feeds persistent grants into manager inspection, and exposes explicit host-side approve/revoke operations. Approval is restricted to capabilities that the exact plugin release requested and that the current capability registry supports. Incompatible plugins cannot be approved. These methods are host APIs and must never be exposed to plugin code. After an approval or revocation, call `inspect()` again to refresh the plugin's state. Example:
 
 ```ts
-const store = new PluginApprovalStore();
-const report = await inspectPlugins(discovery, {
-  getApprovedPermissions: (pluginId, version) =>
-    store.getApprovedPermissions(pluginId, version),
-});
+const approvals = new PluginApprovalController();
+const report = await approvals.inspect(discovery);
+await approvals.approve(discoveredPlugin, ["ui.notifications"]);
+const refreshed = await approvals.inspect(discovery);
 ```
 
 ## Lifecycle contract
@@ -135,13 +134,13 @@ The exact worker technology is intentionally deferred until the manifest and lif
 - `src/plugins/discovery.ts`: immediate-child directory discovery, manifest validation, duplicate-ID rejection, and entry-point containment checks.
 - `src/plugins/compatibility.ts`: exact plugin API-generation compatibility policy.
 - `src/plugins/manager.ts`: discovery/compatibility/approval orchestration and lifecycle snapshot; stops at READY and never executes entries.
+- `src/plugins/approval-controller.ts`: host-owned explicit approval/revocation workflow connected to persistent storage and manager inspection.
 - `src/capabilities/registry.ts`: capability catalog and pure grant-decision policy.
 - `src/capabilities/approval-store.ts`: persistent, version-scoped approval decisions with fail-closed validation and revocation.
 
 ## Planned package boundaries
 
-- Persistent approval storage and lifecycle activation orchestration (follow-up to the manager inspection layer).
-- `src/capabilities/`: approval persistence and scoped facades.
+- `src/runtime/`: isolated plugin execution adapter.
 - `src/runtime/`: isolated plugin execution adapter.
 - Developer tooling, sample plugin, diagnostics, and UI.
 
@@ -155,7 +154,7 @@ These are conceptual boundaries, not a promise that every planned module exists 
 4. Plugin discovery and validation, without executing third-party code. (Implemented.)
 5. Plugin API compatibility policy. (Implemented.)
 6. Plugin manager inspection/orchestration through READY. (Implemented; approval provider is injected.)
-7. Persistent approval storage and explicit lifecycle activation orchestration.
+7. Persistent approval storage and host approval/revocation workflow. (Implemented; UI remains.)
 8. Sandboxed execution adapter and narrow RPC.
 9. Developer tooling, sample plugin, diagnostics, and UI.
 
