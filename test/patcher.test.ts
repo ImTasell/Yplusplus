@@ -41,6 +41,16 @@ test("patches the known Yapper anchor and adds a separate preload", () => {
 
   assert.ok(main.includes(PATCH_MARKER));
   assert.ok(main.includes("registerPreloadScript"));
+  for (const pattern of [
+    "https://www.yapper.website/*",
+    "https://yapper.website/*",
+    "https://www.yapin.gg/*",
+    "https://yapin.gg/*"
+  ]) {
+    assert.ok(main.includes(pattern), "missing exact preload URL filter: " + pattern);
+  }
+  assert.ok(!main.includes("https://*.yapper.website/*"));
+  assert.ok(!main.includes("https://*.yapin.gg/*"));
   assert.ok(main.includes("path.join(__dirname, 'yplusplus-preload.cjs')"));
   assert.ok(preload.includes("contextBridge.exposeInMainWorld"));
   assert.ok(preload.includes("process.isMainFrame"));
