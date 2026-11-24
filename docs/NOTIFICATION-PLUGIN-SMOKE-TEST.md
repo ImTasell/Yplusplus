@@ -8,8 +8,8 @@ Run these commands from the Y++ repository root in Fish:
 
 ```fish
 set PLUGIN_ROOT "$HOME/.local/share/yplusplus/plugins"
-mkdir -p "$PLUGIN_ROOT"
-cp -a examples/notification-plugin "$PLUGIN_ROOT/notification-plugin"
+mkdir -p "$PLUGIN_ROOT/notification-plugin"
+cp -a examples/notification-plugin/. "$PLUGIN_ROOT/notification-plugin/"
 ```
 
 If that destination already exists, inspect it before replacing it. The plugin requests only `ui.notifications`.
