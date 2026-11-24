@@ -29,7 +29,7 @@ export interface PluginExecutionAdapter {
    * The adapter must transfer pluginPort into the isolated context.
    */
   start(plugin: Pick<ManagedPlugin, "id" | "name" | "version" | "directory">,
-    pluginPort: RpcMessagePort): Promise<PluginExecutionHandle>;
+    pluginPort: RpcMessagePort, signal?: AbortSignal): Promise<PluginExecutionHandle>;
 }
 
 export interface PluginRuntimeOptions {
@@ -50,6 +50,7 @@ interface RuntimeRecord {
   state: PluginState;
   readonly transport: RpcPortTransport;
   readonly pluginPort: RpcMessagePort;
+  readonly abortController: AbortController;
   handle?: PluginExecutionHandle;
   unsubscribeExit?: () => void;
   starting: boolean;
@@ -124,11 +125,13 @@ export class PluginRuntimeHost {
       channel.pluginPort.close();
       throw error;
     }
+    const abortController = new AbortController();
     const record: RuntimeRecord = {
       plugin,
       state: "READY",
       transport,
       pluginPort: channel.pluginPort,
+      abortController,
       starting: true,
     };
     this.#records.set(plugin.id, record);
@@ -142,7 +145,7 @@ export class PluginRuntimeHost {
         name: plugin.name,
         version: plugin.version,
         directory: plugin.directory,
-      }, channel.pluginPort);
+      }, channel.pluginPort, abortController.signal);
       void startup.then((lateHandle) => {
         if (startupTimedOut) void lateHandle.terminate();
       }, () => undefined);
@@ -195,6 +198,7 @@ export class PluginRuntimeHost {
   }
 
   async #dispose(record: RuntimeRecord): Promise<void> {
+    record.abortController.abort();
     record.transport.close();
     record.pluginPort.close();
     record.unsubscribeExit?.();
