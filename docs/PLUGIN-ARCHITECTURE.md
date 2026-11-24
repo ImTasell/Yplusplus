@@ -131,9 +131,7 @@ The current lifecycle module defines and tests transition rules only; it does no
 
 ## Execution boundary
 
-The eventual runtime should execute plugins outside the privileged Electron main process. A worker/RPC design is preferred, with structured-clone-compatible messages, request IDs, bounded payload sizes, timeouts, and explicit shutdown. The renderer preload remains a narrow bridge and must not expose `ipcRenderer`, Node globals, or arbitrary host callbacks.
-
-The exact worker technology is intentionally deferred until the manifest and lifecycle contracts are implemented and measured in the target Electron version.
+The runtime executes plugins in a dedicated sandboxed Electron renderer rather than a Node worker. The renderer is hidden and has no plugin UI in this first milestone. The preload exposes only the capability API and keeps raw IPC/MessagePort objects private. A restrictive CSP and per-plugin ephemeral session block network and other resource loading. The host still owns the MessagePort endpoint and binds one RPC session to it.
 
 ### RPC protocol foundation
 
@@ -145,9 +143,19 @@ The transport adapter in `src/runtime/message-port.ts` now binds a `PluginRpcSes
 
 ### Electron main-process MessagePort bridge
 
-`src/runtime/electron-message-port.ts` adapts Electron's `MessagePortMain` EventEmitter API to the host's MessagePort interface. It retains the native endpoint so a future BrowserWindow adapter can transfer the plugin side through `webContents.postMessage`. The channel factory takes an injected `MessageChannelMain` constructor/factory, keeping Electron out of the core package's runtime dependencies. Tests cover the event-emitter bridge and native-port transfer boundary.
+`src/runtime/electron-message-port.ts` adapts Electron's `MessagePortMain` EventEmitter API to the host's MessagePort interface. It retains the native endpoint so the execution adapter can transfer the plugin side through `webContents.postMessage`. The channel factory takes an injected `MessageChannelMain` constructor/factory, keeping Electron out of the core package's runtime dependencies.
 
-This matches the Electron 45 API used by the inspected Yapper 1.2.7 AppImage: main-process `MessagePortMain` uses `on('message')`, while renderer ports use the DOM MessagePort API; `webContents.postMessage` transfers main-process ports into a renderer. The eventual runtime window must explicitly set `sandbox: true`, `contextIsolation: true`, and `nodeIntegration: false`, and its preload must transfer the received port into the plugin page without exposing unrestricted IPC. The actual BrowserWindow factory, preload, renderer bootstrap, CSP, and plugin entry loader are still pending.
+### Sandboxed Electron execution adapter
+
+`src/runtime/electron-execution.ts` now provides `createElectronPluginExecutionAdapter()`. It creates one hidden BrowserWindow per plugin with `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, `webSecurity: true`, a unique non-persistent session partition, no DevTools, and no webview support. Navigation and popups are denied; session permission checks are denied; the session's request hook allows only the trusted bootstrap HTML and blocks other URL requests. The adapter re-reads and validates the manifest and entry immediately before execution, checks real-path containment, and bounds the entry source to 2 MiB by default.
+
+The dedicated preload at `src/runtime/assets/plugin-preload.cjs` receives the transferred MessagePort and exposes only `window.yplusplus.notifications.show()`. It does not expose `ipcRenderer`, Node globals, or the raw port. The trusted bootstrap document at `src/runtime/assets/plugin-host.html` applies a restrictive CSP (`default-src 'none'`, no connections, frames, media, workers, or remote scripts; Blob modules are allowed for the validated entry). The adapter waits for a preload-only nonce handshake, then imports the self-contained ESM entry in the page's main world and awaits its exported `activate()` function. Relative imports from a Blob URL are not supported in this first entry contract; plugins should ship a bundled, self-contained ESM entry.
+
+`npm run build` copies these two runtime assets into `dist/runtime/assets/`; `resolveElectronPluginRuntimeAssets()` returns their paths beside the compiled adapter. Electron remains an injected dependency, so the Y++ core does not add Electron as an npm runtime dependency. The caller supplies BrowserWindow, ipcMain, preload/bootstrap paths, and an `isSandboxDisabled()` guard that accurately checks the real app/Chromium command line.
+
+**Important sandbox caveat:** if the parent Yapper process was launched with `--no-sandbox`, Chromium's global sandbox is disabled. In that state the adapter refuses to start third-party plugins even though the window requests `sandbox: true`. The host must not lie in `isSandboxDisabled()`. This is particularly relevant to the existing BOOT launcher fallback, which may add `--no-sandbox` when user namespaces are unavailable. The adapter is execution plumbing, not a promise that every host launch can safely run plugins.
+
+The adapter is not yet wired into Yapper's live main-process lifecycle, and the trusted native-notification adapter is still pending. The current tests use fake Electron interfaces to verify window policy, port transfer, entry containment, and activation sequencing; a real Electron/Yapper integration test remains necessary.
 
 ### Plugin-side API client and end-to-end RPC
 
@@ -177,11 +185,11 @@ The transport and client now form a tested end-to-end RPC/capability path. They 
 - `src/capabilities/broker.ts`: least-privilege notification facade with per-call approval checks and bounded payload validation.
 - `src/capabilities/approval-store.ts`: persistent, version-scoped approval decisions with fail-closed validation and revocation.
 - `src/runtime/protocol.ts`: strict, bounded, versioned RPC envelopes and payload parsing.
-- `src/runtime/rpc-session.ts`: host dispatcher with concurrency limits, timeouts, and duplicate-request protection.\n- `src/runtime/message-port.ts`: MessagePort transport adapter for one host-bound RPC session.\n- `src/runtime/host.ts`: host-side runtime coordinator for startup, activation, crash handling, and unload.\n- `src/runtime/client.ts`: plugin-side narrow capability API client.\n- `src/runtime/electron-message-port.ts`: adapter for Electron MessagePortMain and native-port transfer.
+- `src/runtime/rpc-session.ts`: host dispatcher with concurrency limits, timeouts, and duplicate-request protection.\n- `src/runtime/message-port.ts`: MessagePort transport adapter for one host-bound RPC session.\n- `src/runtime/host.ts`: host-side runtime coordinator for startup, activation, crash handling, and unload.\n- `src/runtime/client.ts`: plugin-side narrow capability API client.\n- `src/runtime/electron-message-port.ts`: adapter for Electron MessagePortMain and native-port transfer.\n- `src/runtime/electron-execution.ts`: hidden sandboxed BrowserWindow execution adapter with entry revalidation and startup handshake.\n- `src/runtime/assets/plugin-preload.cjs` and `plugin-host.html`: minimal isolated preload and restrictive bootstrap document.
 
 ## Planned package boundaries
 
-- `src/runtime/`: production sandboxed Electron BrowserWindow adapter, dedicated preload, renderer bootstrap/entry loader, CSP/network policy, and session lifecycle wiring (coordinator, RPC transport, plugin client, and Electron MessagePortMain adapter are implemented).
+- `src/runtime/`: live Yapper main-process wiring, trusted notification adapter, plugin management UI, and real Electron integration tests (the sandbox BrowserWindow adapter, dedicated preload, bootstrap, CSP/network policy, and runtime coordinator are implemented as injectable components).
 - A concrete Electron notification adapter and host UI integration.
 - Developer tooling, sample plugin, diagnostics, and UI.
 
@@ -196,7 +204,7 @@ These are conceptual boundaries, not a promise that every planned module exists 
 5. Plugin API compatibility policy. (Implemented.)
 6. Plugin manager inspection/orchestration through READY. (Implemented; approval provider is injected.)
 7. Persistent approval storage and host approval/revocation workflow. (Implemented; UI remains.)
-8. Sandboxed execution adapter and narrow RPC (protocol, session dispatcher, plugin client, MessagePort transport, Electron MessagePortMain adapter, and host runtime coordinator implemented; production BrowserWindow sandbox adapter remains).
+8. Sandboxed execution adapter and narrow RPC (protocol, session dispatcher, plugin client, MessagePort transport, Electron MessagePortMain adapter, runtime coordinator, and injectable sandboxed BrowserWindow adapter implemented; live Yapper main-process wiring and native notification adapter remain).
 9. Developer tooling, diagnostics, and UI. (A minimal API example exists; it is not loadable until the execution adapter lands.)
 
 The current Y++ BOOT patcher and preload remain independent of this plugin subsystem. Plugin work must not destabilize the verified Yapper 1.2.7 integration.
