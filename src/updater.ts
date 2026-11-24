@@ -71,7 +71,7 @@ function validateVersion(version: string): string {
   }
   if (match[4] !== undefined) {
     const identifiers = match[4].split(".");
-    if (identifiers.some((part) => part === "" || !/^[0-9A-Za-z-]+$/.test(part) || (/^\\d+$/.test(part) && part.length > 1 && part.startsWith("0")))) {
+    if (identifiers.some((part) => part === "" || !/^[0-9A-Za-z-]+$/.test(part) || (/^\d+$/.test(part) && part.length > 1 && part.startsWith("0")))) {
       throw new Error(`Update manifest contains an invalid semantic version: ${version}`);
     }
   }
