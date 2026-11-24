@@ -25,7 +25,6 @@ export function bindRpcMessagePort(
   session: PluginRpcSession,
 ): RpcPortTransport {
   let closed = false;
-  let pending = 0;
 
   const close = (): void => {
     if (closed) return;
@@ -36,15 +35,12 @@ export function bindRpcMessagePort(
 
   const onMessage = (event: { readonly data: unknown }): void => {
     if (closed) return;
-    pending += 1;
     void session.dispatch(event.data).then((response) => {
       if (!closed) port.postMessage(response);
     }).catch(() => {
       if (!closed) {
         port.postMessage(rpcFailure("invalid", "INTERNAL_ERROR", "RPC transport dispatch failed."));
       }
-    }).finally(() => {
-      pending -= 1;
     });
   };
 
