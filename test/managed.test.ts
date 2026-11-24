@@ -158,7 +158,7 @@ test("managed install refuses unsupported Yapper versions without moving the sou
         dataHome: join(root, "data"),
         runtimeSourceDir: join(root, "missing-dist")
       }),
-      /only supports 1.2.7/
+      /supported version: 1\\.2\\.7/
     );
     assert.equal(existsSync(extracted), true);
   } finally {
