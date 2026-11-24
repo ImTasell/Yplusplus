@@ -69,14 +69,7 @@ The plugin's own SemVer `version` identifies the plugin release. It is not compa
 
 A plugin may request capabilities such as `ui.notifications`, but the request is only metadata. The host's grant decision is a separate record tied to the plugin ID, installed version, and host policy. The runtime receives a capability object containing only approved operations.
 
-Capabilities are narrow verbs, not broad namespaces such as `node`, `electron`, `filesystem`, or `ipc`. A future broker will own:
-1. A versioned registry of supported capability identifiers.
-2. User/host approval and revocation.
-3. Per-plugin capability facades.
-4. Runtime checks on every operation (not just at plugin startup).
-5. Audit-friendly denial reasons without exposing secrets.
-
-No capability is implemented or granted by this RFC. Unknown capability identifiers can be preserved by manifest validation so newer plugins remain inspectable; the broker denies capabilities absent from its registry.
+Capabilities are narrow verbs, not broad namespaces such as `node`, `electron`, `filesystem`, or `ipc`. The host maintains two independent decisions: execution trust for an exact plugin release, and capability grants for that same release. Trust permits the entry point to run but grants no APIs. Capability approval grants only requested, registered operations. Unknown capability identifiers remain inspectable but are denied by the broker.
 
 ### Capability broker foundation
 
@@ -84,7 +77,7 @@ No capability is implemented or granted by this RFC. Unknown capability identifi
 
 Authorization is checked again on every call, so revoking a grant blocks subsequent calls without relying on a stale manager snapshot. Notification payloads are normalized and bounded (title 1–80 characters, message 1–500); extra keys, missing values, and accessor properties are rejected. The broker receives a trusted notification adapter from the host and does not import Electron or expose Node APIs.
 
-The broker is connected to the RPC foundation and re-checks approval on every operation. `src/runtime/electron-host.ts` now wires the broker to Electron's native Notification API, MessageChannelMain, the sandboxed renderer adapter, and the runtime coordinator. The Yapper 1.2.7 BOOT patch now dynamically imports the managed `src/runtime/bootstrap.js` entry when `YPLUSPLUS_RUNTIME_ENTRY` is set. The bootstrap discovers plugins under the managed XDG data directory (or an absolute `YPLUSPLUS_PLUGIN_DIR` override), loads the persistent approval controller, starts only plugins already in READY, and unloads active runtimes before allowing Yapper to quit. Plugins waiting for approval remain stopped; there is not yet a user-facing approval UI.
+The broker is connected to the RPC foundation and re-checks approval on every operation. `src/runtime/electron-host.ts` now wires the broker to Electron's native Notification API, MessageChannelMain, the sandboxed renderer adapter, and the runtime coordinator. The Yapper 1.2.7 BOOT patch now dynamically imports the managed `src/runtime/bootstrap.js` entry when `YPLUSPLUS_RUNTIME_ENTRY` is set. The bootstrap discovers plugins under the managed XDG data directory (or an absolute `YPLUSPLUS_PLUGIN_DIR` override), loads persistent execution-trust and capability-approval stores, starts only plugins that pass both gates and reach READY, and unloads active runtimes before allowing Yapper to quit. Untrusted plugins—including those requesting zero capabilities—remain stopped. There is not yet a user-facing trust/approval UI, so newly discovered plugins do not auto-start.
 
 ### Persistent approval store
 
@@ -106,7 +99,7 @@ const refreshed = await approvals.inspect(discovery);
 The lifecycle engine models these states:
 
 ```text
-DISCOVERED -> VALIDATING -> WAITING_FOR_APPROVAL -> READY -> INITIALIZING -> ACTIVE
+DISCOVERED -> VALIDATING -> WAITING_FOR_TRUST -> WAITING_FOR_APPROVAL -> READY -> INITIALIZING -> ACTIVE
      |             |                 |                 |
      +----------> FAILED <-----------+-----------------+
                                                         |
@@ -118,8 +111,10 @@ ACTIVE <-> SUSPENDED                                    |
 Rules:
 
 - Discovery never executes plugin code.
-- Validation is complete before approval or initialization.
-- Missing approval leaves a plugin waiting; it is not a failure.
+- Validation is complete before trust or capability approval.
+- Missing execution trust leaves a plugin in WAITING_FOR_TRUST; no entry point is executed.
+- After trust, missing capability approval leaves a plugin in WAITING_FOR_APPROVAL; it is not a failure.
+- A plugin with zero requested capabilities still requires explicit execution trust.
 - Initialization receives an immutable, least-privilege plugin context.
 - Activation occurs only after initialization resolves successfully.
 - Suspend/resume and unload are explicit lifecycle operations.
@@ -179,11 +174,13 @@ The transport and client now form a tested end-to-end RPC/capability path. They 
 - `src/plugins/lifecycle.ts`: lifecycle states and transition policy.
 - `src/plugins/discovery.ts`: immediate-child directory discovery, manifest validation, duplicate-ID rejection, and entry-point containment checks.
 - `src/plugins/compatibility.ts`: exact plugin API-generation compatibility policy.
-- `src/plugins/manager.ts`: discovery/compatibility/approval orchestration and lifecycle snapshot; stops at READY and never executes entries.
-- `src/plugins/approval-controller.ts`: host-owned explicit approval/revocation workflow connected to persistent storage and manager inspection.
+- `src/plugins/manager.ts`: discovery, compatibility, explicit trust, and capability approval orchestration; stops at READY and never executes entries.
+- `src/plugins/approval-controller.ts`: host-owned execution-trust and capability approval/revocation workflow.
+- `src/plugins/trust-store.ts`: persistent exact-release execution trust decisions, separate from capability grants.
 - `src/capabilities/registry.ts`: capability catalog and pure grant-decision policy.
 - `src/capabilities/broker.ts`: least-privilege notification facade with per-call approval checks and bounded payload validation.
-- `src/capabilities/approval-store.ts`: persistent, version-scoped approval decisions with fail-closed validation and revocation.
+- `src/capabilities/approval-store.ts`: persistent, version-scoped capability grants with fail-closed validation and revocation.
+- `src/plugins/trust-store.ts`: persistent version-scoped execution trust, with fail-closed reads and atomic writes.
 - `src/runtime/protocol.ts`: strict, bounded, versioned RPC envelopes and payload parsing.
 - `src/runtime/rpc-session.ts`: host dispatcher with concurrency limits, timeouts, and duplicate-request protection.
 - `src/runtime/message-port.ts`: MessagePort transport adapter for one host-bound RPC session.
@@ -208,7 +205,7 @@ These are conceptual boundaries, not a promise that every planned module exists 
 3. Capability registry and approval/grant separation. (Registry, persistence, broker facade, revocation, and native notification adapter implemented; user-facing approval UI remains.)
 4. Plugin discovery and validation, without executing third-party code. (Implemented.)
 5. Plugin API compatibility policy. (Implemented.)
-6. Plugin manager inspection/orchestration through READY. (Implemented; approval provider is injected.)
+6. Plugin manager inspection/orchestration through READY. (Implemented; explicit execution trust and capability grants are both required.)
 7. Persistent approval storage and host approval/revocation workflow. (Implemented; UI remains.)
 8. Sandboxed execution adapter and narrow RPC (protocol, session dispatcher, plugin client, MessagePort transport, Electron MessagePortMain adapter, runtime coordinator, sandboxed BrowserWindow adapter, native notification host factory, and BOOT main-process bootstrap implemented; real Electron/Yapper validation remains).
 9. Developer tooling, diagnostics, and UI. (The example entry can be executed by the Electron host factory; automatic plugin installation, user-facing approval, and management UI remain.)
