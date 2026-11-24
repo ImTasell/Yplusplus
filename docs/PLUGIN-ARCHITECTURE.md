@@ -185,12 +185,19 @@ The transport and client now form a tested end-to-end RPC/capability path. They 
 - `src/capabilities/broker.ts`: least-privilege notification facade with per-call approval checks and bounded payload validation.
 - `src/capabilities/approval-store.ts`: persistent, version-scoped approval decisions with fail-closed validation and revocation.
 - `src/runtime/protocol.ts`: strict, bounded, versioned RPC envelopes and payload parsing.
-- `src/runtime/rpc-session.ts`: host dispatcher with concurrency limits, timeouts, and duplicate-request protection.\n- `src/runtime/message-port.ts`: MessagePort transport adapter for one host-bound RPC session.\n- `src/runtime/host.ts`: host-side runtime coordinator for startup, activation, crash handling, and unload.\n- `src/runtime/client.ts`: plugin-side narrow capability API client.\n- `src/runtime/electron-message-port.ts`: adapter for Electron MessagePortMain and native-port transfer.\n- `src/runtime/electron-execution.ts`: hidden sandboxed BrowserWindow execution adapter with entry revalidation and startup handshake.\n- `src/runtime/electron-host.ts`: concrete Electron channel, capability broker, notification, and runtime-host wiring.\n- `src/runtime/assets/plugin-preload.cjs` and `plugin-host.html`: minimal isolated preload and restrictive bootstrap document.
+- `src/runtime/rpc-session.ts`: host dispatcher with concurrency limits, timeouts, and duplicate-request protection.
+- `src/runtime/message-port.ts`: MessagePort transport adapter for one host-bound RPC session.
+- `src/runtime/host.ts`: host-side runtime coordinator for startup, activation, crash handling, and unload.
+- `src/runtime/client.ts`: plugin-side narrow capability API client.
+- `src/runtime/electron-message-port.ts`: adapter for Electron MessagePortMain and native-port transfer.
+- `src/runtime/electron-execution.ts`: hidden sandboxed BrowserWindow execution adapter with entry revalidation and startup handshake.
+- `src/runtime/electron-host.ts`: concrete Electron channel, capability broker, notification, and runtime-host wiring.
+- `src/runtime/assets/plugin-preload.cjs` and `plugin-host.html`: minimal isolated preload and restrictive bootstrap document.
 
 ## Planned package boundaries
 
 - `src/runtime/`: live Yapper main-process wiring, plugin management UI, and real Electron integration tests (the sandbox BrowserWindow adapter, dedicated preload, bootstrap, CSP/network policy, runtime coordinator, and native notification host factory are implemented as injectable components).
-- A concrete Electron notification adapter and host UI integration.
+- Yapper main-process host construction and plugin management UI.
 - Developer tooling, sample plugin, diagnostics, and UI.
 
 These are conceptual boundaries, not a promise that every planned module exists today.
@@ -199,7 +206,7 @@ These are conceptual boundaries, not a promise that every planned module exists 
 
 1. Pure manifest schema and validation tests. (Implemented.)
 2. Pure lifecycle transition model and exhaustive transition tests. (Implemented.)
-3. Capability registry and approval/grant separation. (Policy foundation implemented; persistence/facades remain.)
+3. Capability registry and approval/grant separation. (Registry, persistence, broker facade, revocation, and native notification adapter implemented; user-facing approval UI remains.)
 4. Plugin discovery and validation, without executing third-party code. (Implemented.)
 5. Plugin API compatibility policy. (Implemented.)
 6. Plugin manager inspection/orchestration through READY. (Implemented; approval provider is injected.)
