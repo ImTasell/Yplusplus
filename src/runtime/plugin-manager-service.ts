@@ -101,7 +101,7 @@ export class PluginManagerService {
     const plugin = await this.#find(id, version);
     await this.#options.approvals.trust(plugin);
     const report = await this.#options.approvals.inspect(await this.#discover());
-    const ready = report.plugins.find((item) => item.id === id && item.version === version);
+    const ready = report.plugins.find((item) => item.id === pluginId && item.version === pluginVersion);
     if (ready) await this.#startIfReady(ready);
     return this.refresh();
   }
@@ -133,7 +133,7 @@ export class PluginManagerService {
         capabilities.some((item) => typeof item !== "string" || item.length > 128))) {
       throw new TypeError("Invalid capability selection.");
     }
-    await this.#options.approvals.revoke(id, version, capabilities as string[] | undefined);
+    await this.#options.approvals.revoke(pluginId, pluginVersion, capabilities as string[] | undefined);
     return this.refresh();
   }
 
