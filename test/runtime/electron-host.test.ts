@@ -7,7 +7,6 @@ import test from "node:test";
 import type { ManagedPlugin } from "../../src/plugins/manager.js";
 import {
   createElectronPluginRuntimeHost,
-  type ElectronNotificationConstructor,
   type ElectronPluginRuntimeHostOptions,
 } from "../../src/runtime/electron-host.js";
 import type { ElectronMessageChannelMainLike, ElectronMessagePortMainLike } from "../../src/runtime/electron-message-port.js";
@@ -142,7 +141,7 @@ test("Electron runtime host connects MessageChannel, capability broker, and nati
   const shown = new Promise<void>((resolve) => { notificationShown = resolve; });
   const notifications: Array<{ title: string; body: string }> = [];
 
-  class Notification implements ElectronNotificationConstructor {
+  class Notification {
     constructor(readonly value: { title: string; body: string }) {}
     show(): void {
       notifications.push(this.value);
