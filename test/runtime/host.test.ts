@@ -148,3 +148,17 @@ test("unload during startup terminates the late worker handle", async () => {
   assert.equal(runtime.get("dev.example.runtime")?.state, "UNLOADED");
   assert.equal(worker.terminated, 1);
 });
+
+test("closes both channel endpoints if session construction fails", async () => {
+  const hostPort = new TestPort();
+  const pluginPort = new TestPort();
+  const runtime = new PluginRuntimeHost({
+    createChannel: () => ({ hostPort, pluginPort }),
+    createSession: () => { throw new Error("session setup failed"); },
+    execution: { start: async () => handle().value },
+  });
+  await assert.rejects(runtime.start(plugin()), /session setup failed/);
+  assert.equal(hostPort.closed, true);
+  assert.equal(pluginPort.closed, true);
+  assert.equal(runtime.get("dev.example.runtime"), undefined);
+});
