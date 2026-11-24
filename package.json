@@ -13,6 +13,7 @@
     "inspect": "tsx src/cli.ts inspect",
     "patch": "tsx src/cli.ts patch",
     "restore": "tsx src/cli.ts restore",
+    "launch": "tsx src/cli.ts launch",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc"
