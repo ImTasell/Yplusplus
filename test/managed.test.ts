@@ -102,8 +102,8 @@ test("desktop entry safely quotes executable and managed paths", () => {
   assert.ok(entry.includes('Exec="/home/test/.nvm/bin/node"'));
   assert.ok(entry.includes('"launch"'));
   assert.ok(entry.includes('"/home/test/.local/share/yplusplus/versions/Yapper App"'));
-  assert.equal(quoteDesktopArg("/tmp/100%"), '" /tmp/100%%"'.replace('" ', '"'));
-  assert.equal(quoteDesktopArg('/tmp/a "quoted" path'), '" /tmp/a \\"quoted\\" path"'.replace('" ', '"'));
+  assert.equal(quoteDesktopArg("/tmp/100%"), '"/tmp/100%%"');
+  assert.equal(quoteDesktopArg('/tmp/a "quoted" path'), '"/tmp/a \\"quoted\\" path"');
 });
 
 test("managed install patches atomically, installs its runtime and desktop entry, and is idempotent", () => {
