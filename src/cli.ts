@@ -13,9 +13,14 @@ Usage:
   yplusplus patch <extracted-appdir>
   yplusplus restore <extracted-appdir>
   yplusplus launch <patched-appdir> [electron-args...]
+  yplusplus install <Yapper.AppImage>
+  yplusplus check-updates <managed-appdir>
+  yplusplus update <managed-appdir>
 
 The AppDir must be extracted from the official Yapper Linux AppImage first.
 Y++ never modifies the original AppImage.
+The install command creates a versioned managed AppDir and desktop entry.
+Update checks use Yapper's official HTTPS feed; downloads require an explicit update command.
 `);
   process.exit(2);
 }
@@ -56,6 +61,15 @@ try {
     }
     case "launch": {
       launchAppDir(appDir, process.argv.slice(4));
+      break;
+    }
+    case "install": {
+      const result = installAppImage(appDir);
+      console.log("Y++ managed install: " + result.status);
+      console.log("  Yapper: " + result.version);
+      console.log("  AppDir: " + result.appDir);
+      console.log("  Desktop entry: " + result.desktopFile);
+      console.log("  Runtime: " + result.runtimeDir);
       break;
     }
     case "check-updates": {
