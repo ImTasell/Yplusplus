@@ -196,9 +196,8 @@ The transport and client now form a tested end-to-end RPC/capability path. They 
 
 ## Planned package boundaries
 
-- `src/runtime/`: live Yapper main-process wiring, plugin management UI, and real Electron integration tests (the sandbox BrowserWindow adapter, dedicated preload, bootstrap, CSP/network policy, runtime coordinator, and native notification host factory are implemented as injectable components).
-- Yapper main-process host construction and plugin management UI.
-- Developer tooling, sample plugin, diagnostics, and UI.
+- Yapper main-process integration: instantiate the runtime host, discover installed plugins, and manage startup/shutdown.
+- Plugin installation, user-facing approval/management UI, developer tooling, diagnostics, and real Electron integration tests.
 
 These are conceptual boundaries, not a promise that every planned module exists today.
 
