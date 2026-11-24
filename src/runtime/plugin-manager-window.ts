@@ -123,7 +123,7 @@ export function createPluginManagerWindow(options: PluginManagerWindowOptions): 
         [CHANNELS[2], async (event, id, version) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.untrust(id, version); }],
         [CHANNELS[3], async (event, id, version, capabilities) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.approve(id, version, capabilities); }],
         [CHANNELS[4], async (event, id, version, capabilities) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.revoke(id, version, capabilities); }],
-        [CHANNELS[5], async (event, id, version) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.unload(id, version); }],
+        [CHANNELS[5], async (event, id, version) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.unload(id, version); }],\n        [CHANNELS[6], async (event, id, version) => { if (!isAuthorized(event)) throw new Error("Unauthorized manager request."); return options.service.start(id, version); }],
       ];
       for (const [channel, handler] of handlers) options.ipcMain.handle(channel, handler);
 
@@ -131,11 +131,11 @@ export function createPluginManagerWindow(options: PluginManagerWindowOptions): 
       created.webContents.on("will-navigate", (event: { preventDefault(): void }, url: string) => {
         if (url !== managerUrl) event.preventDefault();
       });
-      created.session.webRequest.onBeforeRequest({ urls: ["<all_urls>"] }, (details, callback) => {
+      created.webContents.session.webRequest.onBeforeRequest({ urls: ["<all_urls>"] }, (details, callback) => {
         callback({ cancel: !details.url.startsWith(assetPrefix) });
       });
-      created.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-      created.session.setPermissionCheckHandler(() => false);
+      created.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+      created.webContents.session.setPermissionCheckHandler(() => false);
       created.once("ready-to-show", () => { if (!created.isDestroyed()) created.show(); });
       created.once("closed", () => {
         for (const channel of CHANNELS) options.ipcMain.removeHandler(channel);
