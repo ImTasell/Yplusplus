@@ -72,14 +72,16 @@ function makeRuntimeSource(dir: string): void {
     "patcher.js",
     "asar.js",
     "preload-source.js",
-    "updater.js"
+    "updater.js",
+    "runtime/plugin-manager-service.js",
+    "runtime/plugin-manager-window.js"
   ]) {
     writeFileSync(join(dir, file), "// runtime fixture\n");
   }
   mkdirSync(join(dir, "runtime"), { recursive: true });
-  writeFileSync(join(dir, "runtime", "bootstrap.js"), "// bootstrap fixture\n");
+  writeFileSync(join(dir, "runtime", "bootstrap.js"), "// bootstrap fixture\n");\n  writeFileSync(join(dir, "runtime", "plugin-manager-service.js"), "// manager service fixture\n");\n  writeFileSync(join(dir, "runtime", "plugin-manager-window.js"), "// manager window fixture\n");
   mkdirSync(join(dir, "runtime", "assets"), { recursive: true });
-  writeFileSync(join(dir, "runtime", "assets", "plugin-host.html"), "<html></html>");
+  for (const file of ["plugin-host.html", "plugin-manager.html", "plugin-manager.css", "plugin-manager-renderer.js", "plugin-manager-preload.cjs", "plugin-preload.cjs"]) {\n    writeFileSync(join(dir, "runtime", "assets", file), "/* asset fixture */");\n  }
 }
 
 test("managed paths follow XDG_DATA_HOME and fall back to the user data directory", () => {
@@ -133,13 +135,13 @@ test("managed install patches atomically, installs its runtime and desktop entry
     assert.equal(existsSync(first.appDir + "/resources/app.asar.yplusplus-original"), true);
     assert.equal(existsSync(join(first.runtimeDir, "cli.js")), true);
     assert.equal(existsSync(join(first.runtimeDir, "runtime", "bootstrap.js")), true);
-    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-host.html")), true);
+    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-host.html")), true);\n    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-manager.html")), true);\n    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-manager-preload.cjs")), true);
     assert.equal(JSON.parse(readFileSync(join(first.runtimeDir, "package.json"), "utf8")).type, "module");
 
     const desktop = readFileSync(first.desktopFile, "utf8");
     assert.ok(desktop.includes('Exec="/usr/bin/node"'));
     assert.ok(desktop.includes("Name=Yapin\' (Y++)"));
-    assert.ok(desktop.includes("StartupWMClass=Yapin"));
+    assert.ok(desktop.includes("StartupWMClass=Yapin"));\n    assert.ok(desktop.includes("Actions=PluginManager;"));\n    assert.ok(desktop.includes("[Desktop Action PluginManager]"));\n    assert.ok(desktop.includes("--yplusplus-plugin-manager"));
     assert.ok(desktop.includes('"launch"'));
     assert.ok(desktop.includes(`"${first.appDir}"`));
 
