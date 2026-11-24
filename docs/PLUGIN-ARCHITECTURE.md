@@ -78,6 +78,14 @@ Capabilities are narrow verbs, not broad namespaces such as `node`, `electron`, 
 
 No capability is implemented or granted by this RFC. Unknown capability identifiers can be preserved by manifest validation so newer plugins remain inspectable; the broker denies capabilities absent from its registry.
 
+### Capability broker foundation
+
+`src/capabilities/broker.ts` now builds a least-privilege facade from a host-produced `ManagedPlugin` snapshot. The first implemented operation is `ui.notifications.show({ title, message })`. The broker only exposes it when the plugin is READY, API compatibility metadata is consistent, the manifest requested the capability, and the host approval store currently grants it.
+
+Authorization is checked again on every call, so revoking a grant blocks subsequent calls without relying on a stale manager snapshot. Notification payloads are normalized and bounded (title 1–80 characters, message 1–500); extra keys, missing values, and accessor properties are rejected. The broker receives a trusted notification adapter from the host and does not import Electron or expose Node APIs.
+
+This is a broker/facade foundation, not yet a running plugin runtime: no plugin code is loaded, and no concrete Electron notification adapter or renderer-to-host RPC transport is wired up. The facade must remain host-controlled and must never be passed to untrusted plugin code until the isolated runtime boundary is implemented.
+
 ### Persistent approval store
 
 `src/capabilities/approval-store.ts` stores explicit capability grants under the user's XDG config directory (`$XDG_CONFIG_HOME/yplusplus/permissions.json`, falling back to `~/.config/yplusplus/permissions.json`). Each record is keyed by the exact plugin ID and SemVer release, so upgrading a plugin does not silently inherit the previous release's grants.
@@ -136,11 +144,13 @@ The exact worker technology is intentionally deferred until the manifest and lif
 - `src/plugins/manager.ts`: discovery/compatibility/approval orchestration and lifecycle snapshot; stops at READY and never executes entries.
 - `src/plugins/approval-controller.ts`: host-owned explicit approval/revocation workflow connected to persistent storage and manager inspection.
 - `src/capabilities/registry.ts`: capability catalog and pure grant-decision policy.
+- `src/capabilities/broker.ts`: least-privilege notification facade with per-call approval checks and bounded payload validation.
 - `src/capabilities/approval-store.ts`: persistent, version-scoped approval decisions with fail-closed validation and revocation.
 
 ## Planned package boundaries
 
-- `src/runtime/`: isolated plugin execution adapter.
+- `src/runtime/`: isolated plugin execution adapter and bounded RPC transport.
+- A concrete Electron notification adapter and host UI integration.
 - `src/runtime/`: isolated plugin execution adapter.
 - Developer tooling, sample plugin, diagnostics, and UI.
 
@@ -155,7 +165,7 @@ These are conceptual boundaries, not a promise that every planned module exists 
 5. Plugin API compatibility policy. (Implemented.)
 6. Plugin manager inspection/orchestration through READY. (Implemented; approval provider is injected.)
 7. Persistent approval storage and host approval/revocation workflow. (Implemented; UI remains.)
-8. Sandboxed execution adapter and narrow RPC.
+8. Sandboxed execution adapter and narrow RPC (broker facade foundation implemented; transport remains).
 9. Developer tooling, sample plugin, diagnostics, and UI.
 
 The current Y++ BOOT patcher and preload remain independent of this plugin subsystem. Plugin work must not destabilize the verified Yapper 1.2.7 integration.
