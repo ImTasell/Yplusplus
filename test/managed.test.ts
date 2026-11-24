@@ -165,7 +165,7 @@ test("same-version AppImage payload changes are rejected instead of silently reu
     const installed = installExtractedAppDir(firstExtracted, { dataHome, runtimeSourceDir: runtimeSource });
     assert.throws(
       () => installExtractedAppDir(secondExtracted, { dataHome, runtimeSourceDir: runtimeSource }),
-      /different AppImage payload/
+      /different ASAR payload/
     );
     assert.equal(inspectAppDir(installed.appDir).patched, true);
     assert.equal(existsSync(secondExtracted), true);
