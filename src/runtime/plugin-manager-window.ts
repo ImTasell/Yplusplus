@@ -5,7 +5,7 @@ import type { PluginManagerService } from "./plugin-manager-service.js";
 interface ManagerSession {
   readonly webRequest: {
     onBeforeRequest(
-      filter: { readonly urls: readonly string[] },
+      filter: { readonly urls: string[] },
       listener: ((details: { readonly url: string }, callback: (result: { cancel: boolean }) => void) => void) | null,
     ): void;
   };
