@@ -13,7 +13,7 @@ function managedPlugin(overrides: Partial<ManagedPlugin> = {}): ManagedPlugin {
     name: "Broker fixture",
     version: "1.0.0",
     directory: "/plugins/broker",
-    state: "READY",
+    state: "READY",\n    trusted: true,
     requestedPermissions: ["ui.notifications"],
     approvedPermissions: ["ui.notifications"],
     deniedPermissions: [],
@@ -38,7 +38,7 @@ test("exposes only the approved notification facade", async () => {
   assert.equal(Object.isFrozen(facade.notifications), true);
 });
 
-test("does not expose capabilities that were not approved", async () => {
+test("rejects a READY snapshot without explicit trust", async () => {\n  await assert.rejects(createPluginCapabilityFacade(managedPlugin({ trusted: false }), {\n    getApprovedPermissions: async () => new Set(["ui.notifications"]),\n    notifications: () => undefined,\n  }), CapabilityDeniedError);\n});\n\ntest("does not expose capabilities that were not approved", async () => {
   const facade = await createPluginCapabilityFacade(managedPlugin(), {
     getApprovedPermissions: async () => new Set(),
     notifications: () => assert.fail("adapter must not be called"),
