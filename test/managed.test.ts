@@ -136,7 +136,9 @@ test("managed install patches atomically, installs its runtime and desktop entry
     assert.equal(existsSync(first.appDir + "/resources/app.asar.yplusplus-original"), true);
     assert.equal(existsSync(join(first.runtimeDir, "cli.js")), true);
     assert.equal(existsSync(join(first.runtimeDir, "runtime", "bootstrap.js")), true);
-    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-host.html")), true);\n    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-manager.html")), true);\n    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-manager-preload.cjs")), true);
+    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-host.html")), true);
+    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-manager.html")), true);
+    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-manager-preload.cjs")), true);
     assert.equal(JSON.parse(readFileSync(join(first.runtimeDir, "package.json"), "utf8")).type, "module");
 
     const desktop = readFileSync(first.desktopFile, "utf8");
