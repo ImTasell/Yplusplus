@@ -78,8 +78,8 @@ export function renderDesktopEntry(nodeExecutable: string, cliPath: string, appD
     "[Desktop Entry]",
     "Type=Application",
     "Version=1.0",
-    "Name=Yapper (Y++)",
-    "Comment=Yapper Desktop launched and managed by Y++",
+    "Name=Yapin' (Y++)",
+    "Comment=Yapin' desktop launched and managed by Y++",
     `Exec=${exec}`,
     `Path=${escapeDesktopValue(appDir)}`,
     "Icon=applications-internet",
@@ -87,7 +87,7 @@ export function renderDesktopEntry(nodeExecutable: string, cliPath: string, appD
     "StartupNotify=true",
     "DBusActivatable=false",
     "Categories=Network;InstantMessaging;",
-    "StartupWMClass=Yapper",
+    "StartupWMClass=Yapin",
     ""
   ].join("\n");
 }
@@ -213,7 +213,7 @@ export function installExtractedAppDir(
 
   const runtimeDir = installRuntime(runtimeParent, runtimeSourceDir);
   const cliPath = join(runtimeDir, "cli.js");
-  const desktopFile = join(applicationsDir, "yplusplus-yapper.desktop");
+  const desktopFile = join(applicationsDir, "yplusplus-yapin.desktop");
   writeFileAtomically(desktopFile, renderDesktopEntry(nodeExecutable, cliPath, appDir));
 
   return { status, version: inspected.version, appDir, desktopFile, runtimeDir };
