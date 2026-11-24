@@ -106,7 +106,7 @@ class FakeWindow {
 
 const ipc = new FakeIpcMain();
 
-function fixture(): ManagedPlugin {
+function fixture(): ManagedPlugin & { readonly trusted: true } {
   return {
     id: "dev.example.notification",
     name: "Notification Example",
