@@ -58,7 +58,7 @@ export function createElectronPluginRuntimeHost(
     preloadPath: options.preloadPath ?? assets.preloadPath,
     bootstrapHtmlPath: options.bootstrapHtmlPath ?? assets.bootstrapHtmlPath,
     isSandboxDisabled: options.isSandboxDisabled,
-    startupTimeoutMs: options.executionStartupTimeoutMs,
+    ...(options.executionStartupTimeoutMs === undefined ? {} : { startupTimeoutMs: options.executionStartupTimeoutMs }),
   });
 
   return new PluginRuntimeHost({
@@ -79,6 +79,6 @@ export function createElectronPluginRuntimeHost(
       return new PluginRpcSession({ facade });
     },
     execution,
-    startupTimeoutMs: options.startupTimeoutMs,
+    ...(options.startupTimeoutMs === undefined ? {} : { startupTimeoutMs: options.startupTimeoutMs }),
   });
 }
