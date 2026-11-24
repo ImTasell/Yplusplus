@@ -16,7 +16,7 @@
     "launch": "tsx src/cli.ts launch",
     "test": "tsx --test test/*.test.ts test/**/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-runtime-assets.mjs",
     "install-managed": "npm run build && node dist/cli.js install",
     "check-updates": "tsx src/cli.ts check-updates",
     "update-managed": "npm run build && node dist/cli.js update"
