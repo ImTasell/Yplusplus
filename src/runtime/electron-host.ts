@@ -1,0 +1,84 @@
+/**
+ * Concrete Electron host wiring for the Y++ plugin runtime.
+ *
+ * Electron remains injected so unit tests and the core package do not need an
+ * Electron dependency. Pass the real exports from the host application's
+ * Electron main process.
+ */
+import { createPluginCapabilityFacade } from "../capabilities/broker.js";
+import type { PluginApprovalProvider } from "../plugins/manager.js";
+import { PluginRpcSession } from "./rpc-session.js";
+import { PluginRuntimeHost } from "./host.js";
+import {
+  createElectronMessageChannel,
+  type ElectronMessageChannelMainLike,
+} from "./electron-message-port.js";
+import {
+  createElectronPluginExecutionAdapter,
+  resolveElectronPluginRuntimeAssets,
+  type ElectronPluginExecutionOptions,
+} from "./electron-execution.js";
+
+export interface ElectronNotificationLike {
+  show(): void;
+}
+
+export interface ElectronNotificationConstructor {
+  new(options: { readonly title: string; readonly body: string }): ElectronNotificationLike;
+}
+
+export interface ElectronPluginRuntimeHostOptions {
+  readonly BrowserWindow: ElectronPluginExecutionOptions["BrowserWindow"];
+  readonly ipcMain: ElectronPluginExecutionOptions["ipcMain"];
+  readonly MessageChannelMain: new () => ElectronMessageChannelMainLike;
+  readonly Notification: ElectronNotificationConstructor;
+  readonly getApprovedPermissions: PluginApprovalProvider;
+  /** Must detect --no-sandbox in the actual parent Electron/Chromium process. */
+  readonly isSandboxDisabled: () => boolean;
+  readonly preloadPath?: string;
+  readonly bootstrapHtmlPath?: string;
+  readonly startupTimeoutMs?: number;
+  readonly executionStartupTimeoutMs?: number;
+}
+
+/**
+ * Wire Electron MessageChannelMain, sandboxed BrowserWindows, the approval
+ * store-backed capability broker, and native desktop notifications together.
+ *
+ * This creates a ready-to-use runtime host, but the Yapper main process must
+ * still own plugin discovery, approval UI, and calls to start()/unload().
+ */
+export function createElectronPluginRuntimeHost(
+  options: ElectronPluginRuntimeHostOptions,
+): PluginRuntimeHost {
+  const assets = resolveElectronPluginRuntimeAssets();
+  const execution = createElectronPluginExecutionAdapter({
+    BrowserWindow: options.BrowserWindow,
+    ipcMain: options.ipcMain,
+    preloadPath: options.preloadPath ?? assets.preloadPath,
+    bootstrapHtmlPath: options.bootstrapHtmlPath ?? assets.bootstrapHtmlPath,
+    isSandboxDisabled: options.isSandboxDisabled,
+    startupTimeoutMs: options.executionStartupTimeoutMs,
+  });
+
+  return new PluginRuntimeHost({
+    createChannel: () => createElectronMessageChannel(
+      () => new options.MessageChannelMain(),
+    ),
+    createSession: async (plugin) => {
+      const facade = await createPluginCapabilityFacade(plugin, {
+        getApprovedPermissions: options.getApprovedPermissions,
+        notifications: async (_identity, request) => {
+          const notification = new options.Notification({
+            title: request.title,
+            body: request.message,
+          });
+          notification.show();
+        },
+      });
+      return new PluginRpcSession({ facade });
+    },
+    execution,
+    startupTimeoutMs: options.startupTimeoutMs,
+  });
+}
