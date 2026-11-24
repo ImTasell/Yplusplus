@@ -35,3 +35,49 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  appimage-integration:
+    if: contains(github.event.head_commit.message, '[y++-appimage-integration]')
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies and build
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Download the previously captured official AppImage
+        uses: actions/download-artifact@v4
+        with:
+          name: yapper-appimage-research
+          path: /tmp/yapper-artifact
+          repository: ImTasell/Yplusplus
+          run-id: 45324694945
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Patch and restore the real Yapper 1.2.7 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x /tmp/yapper-artifact/Yapper-Setup.AppImage
+          mkdir -p /tmp/yplusplus-integration
+          cd /tmp/yplusplus-integration
+          /tmp/yapper-artifact/Yapper-Setup.AppImage --appimage-extract
+          APPDIR="/tmp/yplusplus-integration/squashfs-root"
+
+          node "$GITHUB_WORKSPACE/dist/src/cli.js" inspect "$APPDIR"
+          node "$GITHUB_WORKSPACE/dist/src/cli.js" patch "$APPDIR"
+          node "$GITHUB_WORKSPACE/dist/src/cli.js" inspect "$APPDIR" | tee /tmp/yplusplus-inspect.txt
+          grep -q 'Y++ patch present: yes' /tmp/yplusplus-inspect.txt
+
+          node "$GITHUB_WORKSPACE/dist/src/cli.js" restore "$APPDIR"
+          cmp "$APPDIR/resources/app.asar" "$APPDIR/resources/app.asar.yplusplus-original"
