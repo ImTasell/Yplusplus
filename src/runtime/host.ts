@@ -118,14 +118,21 @@ export class PluginRuntimeHost {
 
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
+      let startupTimedOut = false;
       const startup = this.#options.execution.start({
         id: plugin.id,
         name: plugin.name,
         version: plugin.version,
         directory: plugin.directory,
       }, channel.pluginPort);
+      void startup.then((lateHandle) => {
+        if (startupTimedOut) void lateHandle.terminate();
+      }, () => undefined);
       const timedOut = new Promise<never>((_, reject) => {
-        timeout = setTimeout(() => reject(new Error("Plugin startup timed out.")), this.#startupTimeoutMs);
+        timeout = setTimeout(() => {
+          startupTimedOut = true;
+          reject(new Error("Plugin startup timed out."));
+        }, this.#startupTimeoutMs);
       });
       const handle = await Promise.race([startup, timedOut]);
       record.handle = handle;
@@ -169,9 +176,9 @@ export class PluginRuntimeHost {
     record.transport.close();
     record.pluginPort.close();
     record.unsubscribeExit?.();
-    record.unsubscribeExit = undefined;
+    delete record.unsubscribeExit;
     const handle = record.handle;
-    record.handle = undefined;
+    delete record.handle;
     if (handle) {
       try { await handle.terminate(); } catch { /* termination is best-effort after channel revocation */ }
     }
