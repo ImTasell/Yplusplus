@@ -135,6 +135,12 @@ The unpacked `uiohook-napi` native module must be preserved when rebuilding or r
 
 Do not rely on `NODE_OPTIONS=--require=...` as the primary bootstrap. Electron documents that most `NODE_OPTIONS` flags are explicitly disallowed in packaged applications, except a small allowlist, and the `nodeOptions` fuse can disable the variable entirely.
 
+
+
+### ASAR integrity on Linux
+
+Electron's official ASAR-integrity documentation currently lists runtime integrity enforcement for macOS (Electron 16+) and Windows (Electron 30+), not Linux. Therefore the inspected Linux AppImage is not expected to enforce Electron's embedded ASAR integrity check in the same way as those platforms. This removes one potential blocker to an ASAR patch, but it does **not** make blind patching safe: retain the original archive, verify its header and file hashes, and run a version-specific smoke test before launch.
+
 ## Recommended first implementation milestone: Y++ BOOT
 
 Implement only enough to prove the integration:
