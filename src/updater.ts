@@ -69,6 +69,12 @@ function validateVersion(version: string): string {
       throw new Error(`Update manifest version component is too large: ${version}`);
     }
   }
+  if (match[4] !== undefined) {
+    const identifiers = match[4].split(".");
+    if (identifiers.some((part) => part === "" || !/^[0-9A-Za-z-]+$/.test(part) || (/^\\d+$/.test(part) && part.length > 1 && part.startsWith("0")))) {
+      throw new Error(`Update manifest contains an invalid semantic version: ${version}`);
+    }
+  }
   return version;
 }
 
@@ -99,7 +105,7 @@ export function compareVersions(left: string, right: string): number {
     if (av === bv) continue;
     const an = /^\d+$/.test(av);
     const bn = /^\d+$/.test(bv);
-    if (an && bn) return Math.sign(Number(av) - Number(bv));
+    if (an && bn) return BigInt(av) < BigInt(bv) ? -1 : 1;
     if (an !== bn) return an ? -1 : 1;
     return av < bv ? -1 : 1;
   }
@@ -129,7 +135,8 @@ async function fetchFollowingOfficialRedirects(
   for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
     const response = await fetcher(url, {
       redirect: "manual",
-      headers: { "User-Agent": "Y++-BOOT/0.1.0" }
+      headers: { "User-Agent": "Y++-BOOT/0.1.0" },
+      signal: AbortSignal.timeout(15 * 60_000)
     });
 
     if ([301, 302, 303, 307, 308].includes(response.status)) {
@@ -272,7 +279,7 @@ function readFeedConfiguration(appDir: string): URL {
     throw new Error("Unsupported Yapper update configuration; expected the verified generic HTTPS provider.");
   }
   const feed = validateOfficialUrl(fields.url);
-  if (feed.hostname !== "www.yapper.website") {
+  if (feed.hostname !== "www.yapper.website" || (feed.pathname !== "/download" && feed.pathname !== "/download/")) {
     throw new Error("Yapper update feed host changed; refusing to use an unresearched update provider.");
   }
   if (!feed.pathname.endsWith("/")) feed.pathname += "/";
