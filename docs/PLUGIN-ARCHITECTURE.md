@@ -85,14 +85,25 @@ The broker is connected to the RPC foundation and re-checks approval on every op
 
 The store supports per-capability revocation, release-wide revocation, and plugin-wide revocation. Writes are serialized within the process, staged in the same directory, and atomically renamed. The containing directory is set to mode `0700`; the file is written as `0600`. Symlink/non-regular-file targets, broad file permissions, malformed JSON, unknown schema fields, duplicate records, and invalid values fail closed. This is host-side persistence only; it does not itself decide whether a capability exists or is safe to grant.
 
-The host approval workflow is implemented by `src/plugins/approval-controller.ts`. The controller owns the store, feeds persistent grants into manager inspection, and exposes explicit host-side approve/revoke operations. Approval is restricted to capabilities that the exact plugin release requested and that the current capability registry supports. Incompatible plugins cannot be approved. These methods are host APIs and must never be exposed to plugin code. After an approval or revocation, call `inspect()` again to refresh the plugin's state. Example:
+The host workflow is implemented by `src/plugins/approval-controller.ts`. It exposes separate `trust(plugin)` / `untrust(...)` and `approve(plugin, capabilities)` / `revoke(...)` operations. Trust is scoped to the exact plugin ID and SemVer release; trusting a release does not grant capabilities. Capability approval is restricted to capabilities requested by that release and supported by the current registry. Incompatible plugins cannot be trusted or approved. These methods are host APIs and must never be exposed to plugin code. After a decision, call `inspect()` again to refresh the plugin state. Example:
 
 ```ts
 const approvals = new PluginApprovalController();
-const report = await approvals.inspect(discovery);
+const report = await approvals.inspect(discovery); // WAITING_FOR_TRUST
+await approvals.trust(discoveredPlugin);
 await approvals.approve(discoveredPlugin, ["ui.notifications"]);
-const refreshed = await approvals.inspect(discovery);
+const refreshed = await approvals.inspect(discovery); // READY
 ```
+
+For the current headless milestone, the managed CLI exposes the same host-only controls:
+
+```sh
+node ~/.local/share/yplusplus/runtime/0.1.4/cli.js plugins list
+node ~/.local/share/yplusplus/runtime/0.1.4/cli.js plugins trust dev.example.plugin 1.0.0
+node ~/.local/share/yplusplus/runtime/0.1.4/cli.js plugins approve dev.example.plugin 1.0.0 ui.notifications
+```
+
+Trust and capability grants are persisted separately under `$XDG_CONFIG_HOME/yplusplus/` (or `~/.config/yplusplus/`).
 
 ## Lifecycle contract
 
