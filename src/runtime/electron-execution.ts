@@ -11,7 +11,7 @@
 import { randomUUID } from "node:crypto";
 import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   PLUGIN_MANIFEST_FILE,
   validatePluginManifest,
