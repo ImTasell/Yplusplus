@@ -127,7 +127,7 @@ The command builds the Y++ runtime, invokes the AppImage's own `--appimage-extra
 Default locations follow the XDG layout:
 
 - AppDir: `$XDG_DATA_HOME/yplusplus/versions/yapper-desktop-1.2.7` (defaults to `~/.local/share` when `XDG_DATA_HOME` is unset or invalid).
-- Self-contained Y++ Node runtime: `$XDG_DATA_HOME/yplusplus/runtime/0.1.0`.
+- Self-contained Y++ Node runtime: `$XDG_DATA_HOME/yplusplus/runtime/0.1.1`.
 - Desktop entry: `$XDG_DATA_HOME/applications/yplusplus-yapper.desktop`.
 
 The desktop entry points to the copied Y++ runtime and the Node executable used during installation; it does not depend on the source Git checkout remaining in place. The launcher invokes the managed AppDir through Y++'s safe direct-Electron launch path. Reinstalling the same Yapper version reuses the existing managed AppDir instead of replacing it. Installing a different supported version creates a separate version directory and atomically updates the desktop entry to point to it; older versions are retained.
