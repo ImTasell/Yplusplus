@@ -128,6 +128,7 @@ function plugin(directory: string): ManagedPlugin {
     name: "Notification Example",
     version: "1.0.0",
     directory,
+    entry: "index.js",
     state: "READY",
     requestedPermissions: ["ui.notifications"],
     approvedPermissions: ["ui.notifications"],
