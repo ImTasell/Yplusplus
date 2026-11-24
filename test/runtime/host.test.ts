@@ -141,7 +141,10 @@ test("unload during startup terminates the late worker handle", async () => {
   const worker = handle();
   const { runtime } = setup(() => new Promise((done) => { resolve = done; }));
   const starting = runtime.start(plugin());
-  await Promise.resolve();
+  for (let attempt = 0; attempt < 20 && runtime.get("dev.example.runtime")?.state !== "INITIALIZING"; attempt += 1) {
+    await new Promise((done) => setTimeout(done, 1));
+  }
+  assert.equal(runtime.get("dev.example.runtime")?.state, "INITIALIZING");
   await runtime.unload("dev.example.runtime");
   resolve(worker.value);
   await assert.rejects(starting, /stopped during initialization/);
