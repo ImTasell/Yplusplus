@@ -18,7 +18,7 @@ async function fixture(root: string, folder: string, manifest: unknown): Promise
   await writeFile(path.join(dir, "yplusplus.plugin.json"), JSON.stringify(manifest), "utf8");
 }
 
-test("marks a permission-free compatible plugin READY without executing it", async () => {
+test("holds even permission-free plugins until explicitly trusted", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "yplusplus-manager-"));
   try {
     await fixture(root, "simple", makeManifest("dev.example.simple"));
@@ -45,7 +45,7 @@ test("marks compatible and approved capability requests READY", async () => {
   try {
     await fixture(root, "approved", makeManifest("dev.example.approved", 1, ["ui.notifications"]));
     const report = await inspectPlugins(await discoverPlugins(root), {
-      getApprovedPermissions: async () => new Set(["ui.notifications"]),
+      isTrusted: async () => true,\n      getApprovedPermissions: async () => new Set(["ui.notifications"]),
     });
     assert.equal(report.plugins[0]?.state, "READY");
     assert.deepEqual(report.plugins[0]?.approvedPermissions, ["ui.notifications"]);
@@ -58,7 +58,7 @@ test("rejects incompatible API generations before asking for approval", async ()
   try {
     await fixture(root, "future", makeManifest("dev.example.future", 2, ["ui.notifications"]));
     const report = await inspectPlugins(await discoverPlugins(root), {
-      getApprovedPermissions: async () => { approvalLookups += 1; return new Set(["ui.notifications"]); },
+      isTrusted: async () => { throw new Error("must not check trust for incompatible plugin"); },\n      getApprovedPermissions: async () => { approvalLookups += 1; return new Set(["ui.notifications"]); },
     });
     assert.equal(report.plugins[0]?.state, "FAILED");
     assert.equal(report.plugins[0]?.issue?.code, "unsupported-api-version");
@@ -72,7 +72,7 @@ test("isolates approval-provider failures and never treats them as grants", asyn
   try {
     await fixture(root, "broken-store", makeManifest("dev.example.store", 1, ["ui.notifications"]));
     const report = await inspectPlugins(await discoverPlugins(root), {
-      getApprovedPermissions: async () => { throw new Error("storage offline"); },
+      isTrusted: async () => true,\n      getApprovedPermissions: async () => { throw new Error("storage offline"); },
     });
     assert.equal(report.plugins[0]?.state, "FAILED");
     assert.deepEqual(report.plugins[0]?.approvedPermissions, []);
