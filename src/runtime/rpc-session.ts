@@ -74,18 +74,22 @@ export class PluginRpcSession {
 
     this.#inFlight += 1;
     let timeout: ReturnType<typeof setTimeout> | undefined;
+    let didTimeout = false;
     const operation = Promise.resolve()
       .then(() => show(request.payload))
       .finally(() => { this.#inFlight -= 1; });
     try {
       const timedOut = new Promise<never>((_, reject) => {
-        timeout = setTimeout(() => reject(new Error("RPC request timed out.")), this.#timeoutMs);
+        timeout = setTimeout(() => {
+          didTimeout = true;
+          reject(new Error("RPC request timed out."));
+        }, this.#timeoutMs);
       });
       await Promise.race([operation, timedOut]);
       return rpcSuccess(request.requestId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Capability operation failed.";
-      if (message === "RPC request timed out.") {
+      if (didTimeout) {
         return rpcFailure(request.requestId, "REQUEST_TIMEOUT", "Capability operation exceeded its time limit.");
       }
       if (error instanceof Error && error.name === "CapabilityDeniedError") {
