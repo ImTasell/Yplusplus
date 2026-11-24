@@ -19,7 +19,7 @@ test("declares the complete lifecycle state set including READY", () => {
 test("allows successful activation with and without an approval wait", () => {
   const paths: PluginState[][] = [
     ["DISCOVERED", "VALIDATING", "WAITING_FOR_TRUST", "WAITING_FOR_APPROVAL", "READY", "INITIALIZING", "ACTIVE"],
-    ["DISCOVERED", "VALIDATING", "READY", "INITIALIZING", "ACTIVE"],
+    ["DISCOVERED", "VALIDATING", "WAITING_FOR_TRUST", "READY", "INITIALIZING", "ACTIVE"],
   ];
   for (const path of paths) {
     for (let i = 0; i < path.length - 1; i += 1) {
