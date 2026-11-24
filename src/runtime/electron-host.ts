@@ -19,6 +19,21 @@ import {
   type ElectronPluginExecutionOptions,
 } from "./electron-execution.js";
 
+export interface ElectronAppCommandLineLike {
+  commandLine: {
+    hasSwitch(name: string): boolean;
+  };
+}
+
+/** Fail closed when Chromium's process-wide sandbox switch is disabled. */
+export function isElectronSandboxDisabled(
+  app: ElectronAppCommandLineLike,
+  argv: readonly string[] = process.argv,
+): boolean {
+  return app.commandLine.hasSwitch("no-sandbox") ||
+    argv.some((argument) => argument === "--no-sandbox" || argument.startsWith("--no-sandbox="));
+}
+
 export interface ElectronNotificationLike {
   show(): void;
 }
