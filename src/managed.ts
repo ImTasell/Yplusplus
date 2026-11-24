@@ -7,11 +7,12 @@ import {
   mkdtempSync,
   renameSync,
   rmSync,
+  readFileSync,
   statSync,
   writeFileSync
 } from "node:fs";
 import { homedir } from "node:os";
-import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BACKUP_SUFFIX, inspectAppDir, patchAppDir } from "./patcher.js";
 
@@ -61,7 +62,8 @@ export function quoteDesktopArg(value: string): string {
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
     .replace(/`/g, "\\`")
-    .replace(/\$/g, "\\$");
+    .replace(/\$/g, "\\$")
+    .replace(/%/g, "%%");
   return `"${escaped}"`;
 }
 
@@ -166,8 +168,10 @@ export function installExtractedAppDir(
   const runtimeParent = join(managedRoot, "runtime");
   const applicationsDir = resolve(options.applicationsDir ?? join(dataHome, "applications"));
   const nodeExecutable = resolve(options.nodeExecutable ?? process.execPath);
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const candidateDistDir = join(moduleDir, "../dist");
   const runtimeSourceDir = resolve(
-    options.runtimeSourceDir ?? join(dirname(fileURLToPath(import.meta.url)), "../dist")
+    options.runtimeSourceDir ?? (existsSync(join(candidateDistDir, "cli.js")) ? candidateDistDir : moduleDir)
   );
 
   const sourceAppDir = resolve(extractedAppDir);
@@ -196,8 +200,14 @@ export function installExtractedAppDir(
       throw new Error(`Managed install target already exists with unexpected metadata: ${appDir}`);
     }
     patchAppDir(appDir);
-    if (!existsSync(existing.archivePath + BACKUP_SUFFIX)) {
+    const backupPath = existing.archivePath + BACKUP_SUFFIX;
+    if (!existsSync(backupPath)) {
       throw new Error("Existing managed installation has no clean Y++ backup; refusing to adopt it.");
+    }
+    const previousOriginal = readFileSync(backupPath);
+    const incomingOriginal = readFileSync(join(sourceAppDir, "resources", "app.asar"));
+    if (!previousOriginal.equals(incomingOriginal)) {
+      throw new Error("A different AppImage payload uses this Yapper version number; refusing to replace or silently reuse it.");
     }
     status = "already-installed";
   } else {
