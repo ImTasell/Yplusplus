@@ -127,12 +127,42 @@ The command builds the Y++ runtime, invokes the AppImage's own `--appimage-extra
 Default locations follow the XDG layout:
 
 - AppDir: `$XDG_DATA_HOME/yplusplus/versions/yapper-desktop-1.2.7` (defaults to `~/.local/share` when `XDG_DATA_HOME` is unset or invalid).
-- Self-contained Y++ Node runtime: `$XDG_DATA_HOME/yplusplus/runtime/0.1.0`.
+- Self-contained Y++ Node runtime: `$XDG_DATA_HOME/yplusplus/runtime/0.1.1`.
 - Desktop entry: `$XDG_DATA_HOME/applications/yplusplus-yapper.desktop`.
 
 The desktop entry points to the copied Y++ runtime and the Node executable used during installation; it does not depend on the source Git checkout remaining in place. The launcher invokes the managed AppDir through Y++'s safe direct-Electron launch path. Reinstalling the same Yapper version reuses the existing managed AppDir instead of replacing it. Installing a different supported version creates a separate version directory and atomically updates the desktop entry to point to it; older versions are retained.
 
 The source AppImage remains wherever it was downloaded. Once installation succeeds, it can be archived or deleted independently of the managed AppDir. Unsupported Yapper versions, malformed AppDirs, incomplete managed runtimes, and existing targets without a Y++ backup are rejected rather than overwritten. The patcher currently supports **only Yapper 1.2.7**, so newer upstream releases remain fail-closed until their patch anchors are researched and added.
+
+## Y++-managed update checks
+
+Y++ reads the generic update provider from the managed AppDir's original `resources/app-update.yml`. The inspected Yapper 1.2.7 file points to `https://www.yapper.website/download`. For Linux x64, the matching electron-updater 6.8.11 implementation requests `latest-linux.yml` from that feed and selects an `.AppImage` entry from its update metadata.
+
+Check without downloading:
+
+```bash
+npm run check-updates -- /path/to/managed-yapper-appdir
+```
+
+Download and install an update explicitly:
+
+```bash
+npm run update-managed -- /path/to/managed-yapper-appdir
+```
+
+The update manager:
+- Uses HTTPS only and restricts the feed/download/redirect hosts to the verified Yapper web and file hosts.
+- Parses the Linux update channel metadata and selects the AppImage artifact.
+- Refuses downgrades and refuses to download versions the current Y++ patcher does not explicitly support.
+- Streams the AppImage to a temporary file, enforces a 1 GiB maximum, checks the declared size when present, and verifies the manifest's SHA-512 before extraction.
+- Hands the verified AppImage to the same managed installer used for first-time installs. The new version gets a separate version directory; the desktop entry switches to it only after patching succeeds.
+- Removes the temporary downloaded AppImage after installation. The currently running Yapper process is not forcibly restarted; the new version is used on the next launch.
+
+**Updates are check-only unless the user explicitly runs the update command.** Yapper's built-in updater remains disabled. The inspected `electron-updater` 6.8.11 AppImage updater requires `APPIMAGE`; when installing, it unlinks that path, moves the downloaded AppImage into it, and then launches it. Y++ continues to remove `APPIMAGE` from the child environment so that code cannot replace AppRun or bypass the managed installation.
+
+**Authenticity limitation:** the inspected `app-update.yml` contains a generic HTTPS provider and no embedded update-manifest signing key. SHA-512 verifies the downloaded artifact against the metadata and detects corruption, while HTTPS authenticates the feed connection; it is not an independent publisher signature. Y++ does not claim signed-update authenticity. A future pinned-signature or upstream-signed-manifest mechanism would strengthen this trust model.
+
+The current patcher still supports only Yapper **1.2.7**. If the feed advertises a newer version, `check-updates` reports it but `update` refuses to download it until that exact version's ASAR structure and patch anchors have been researched and supported.
 
 One GitHub Actions integration run extracted the captured official 1.2.7 AppImage, inspected its real ASAR, patched it successfully, verified the patch marker, restored the backup, and compared the restored archive byte-for-byte with the original. A second headless Electron integration run launched the patched AppDir under Xvfb and queried the live renderer over Chromium DevTools Protocol. It confirmed `window.yplusplus` (`version: 0.1.0`, `ready: true`) and the original `window.yapperDesktop` were both present. The temporary integration job was removed after verification.
 

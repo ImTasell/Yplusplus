@@ -71,7 +71,8 @@ function makeRuntimeSource(dir: string): void {
     "launcher.js",
     "patcher.js",
     "asar.js",
-    "preload-source.js"
+    "preload-source.js",
+    "updater.js"
   ]) {
     writeFileSync(join(dir, file), "// runtime fixture\n");
   }

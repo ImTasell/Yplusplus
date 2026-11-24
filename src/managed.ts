@@ -16,7 +16,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BACKUP_SUFFIX, inspectAppDir, patchAppDir } from "./patcher.js";
 
-export const YPLUSPLUS_RUNTIME_VERSION = "0.1.0";
+export const YPLUSPLUS_RUNTIME_VERSION = "0.1.1";
 
 const RUNTIME_FILES = [
   "cli.js",
@@ -24,7 +24,8 @@ const RUNTIME_FILES = [
   "launcher.js",
   "patcher.js",
   "asar.js",
-  "preload-source.js"
+  "preload-source.js",
+  "updater.js"
 ] as const;
 
 export interface ManagedInstallOptions {
