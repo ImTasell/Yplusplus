@@ -31,11 +31,12 @@ export interface PluginManagerSnapshot {
   }[];
 }
 
-function requireIdentity(id: unknown, version: unknown): asserts id is string {
+function validateIdentity(id: unknown, version: unknown): readonly [string, string] {
   if (typeof id !== "string" || typeof version !== "string" ||
       id.length > 128 || version.length > 128) {
     throw new TypeError("A valid plugin ID and exact version are required.");
   }
+  return [id, version];
 }
 
 export class PluginManagerService {
@@ -97,8 +98,8 @@ export class PluginManagerService {
   }
 
   async trust(id: unknown, version: unknown): Promise<PluginManagerSnapshot> {
-    requireIdentity(id, version);
-    const plugin = await this.#find(id, version);
+    const [pluginId, pluginVersion] = validateIdentity(id, version);
+    const plugin = await this.#find(pluginId, pluginVersion);
     await this.#options.approvals.trust(plugin);
     const report = await this.#options.approvals.inspect(await this.#discover());
     const ready = report.plugins.find((item) => item.id === pluginId && item.version === pluginVersion);
@@ -107,28 +108,28 @@ export class PluginManagerService {
   }
 
   async untrust(id: unknown, version: unknown): Promise<PluginManagerSnapshot> {
-    requireIdentity(id, version);
-    await this.#options.approvals.untrust(id, version);
-    await this.#options.runtime.unload(id);
+    const [pluginId, pluginVersion] = validateIdentity(id, version);
+    await this.#options.approvals.untrust(pluginId, pluginVersion);
+    await this.#options.runtime.unload(pluginId);
     return this.refresh();
   }
 
   async approve(id: unknown, version: unknown, capabilities: unknown): Promise<PluginManagerSnapshot> {
-    requireIdentity(id, version);
+    const [pluginId, pluginVersion] = validateIdentity(id, version);
     if (!Array.isArray(capabilities) || capabilities.length === 0 ||
         capabilities.some((item) => typeof item !== "string" || item.length > 128)) {
       throw new TypeError("Select at least one requested capability.");
     }
-    const plugin = await this.#find(id, version);
+    const plugin = await this.#find(pluginId, pluginVersion);
     await this.#options.approvals.approve(plugin, capabilities as string[]);
     const report = await this.#options.approvals.inspect(await this.#discover());
-    const ready = report.plugins.find((item) => item.id === id && item.version === version);
+    const ready = report.plugins.find((item) => item.id === pluginId && item.version === pluginVersion);
     if (ready) await this.#startIfReady(ready);
     return this.refresh();
   }
 
   async revoke(id: unknown, version: unknown, capabilities?: unknown): Promise<PluginManagerSnapshot> {
-    requireIdentity(id, version);
+    const [pluginId, pluginVersion] = validateIdentity(id, version);
     if (capabilities !== undefined && (!Array.isArray(capabilities) ||
         capabilities.some((item) => typeof item !== "string" || item.length > 128))) {
       throw new TypeError("Invalid capability selection.");
@@ -138,9 +139,21 @@ export class PluginManagerService {
   }
 
   async unload(id: unknown, version: unknown): Promise<PluginManagerSnapshot> {
-    requireIdentity(id, version);
-    const plugin = await this.#find(id, version);
+    const [pluginId, pluginVersion] = validateIdentity(id, version);
+    const plugin = await this.#find(pluginId, pluginVersion);
     await this.#options.runtime.unload(plugin.manifest.id);
+    return this.refresh();
+  }
+
+  async start(id: unknown, version: unknown): Promise<PluginManagerSnapshot> {
+    const [pluginId, pluginVersion] = validateIdentity(id, version);
+    const report = await this.#options.approvals.inspect(await this.#discover());
+    const plugin = report.plugins.find((item) => item.id === pluginId && item.version === pluginVersion);
+    if (!plugin) throw new Error(`No discovered plugin matches ${pluginId}@${pluginVersion}.`);
+    if (plugin.state !== "READY" || plugin.trusted !== true) {
+      throw new Error("Only trusted, fully approved plugins can be started.");
+    }
+    await this.#startIfReady(plugin);
     return this.refresh();
   }
 }
