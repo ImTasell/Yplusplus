@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync
@@ -96,6 +97,7 @@ test("desktop entry safely quotes executable and managed paths", () => {
   assert.ok(entry.includes('Exec="/home/test/.nvm/bin/node"'));
   assert.ok(entry.includes('"launch"'));
   assert.ok(entry.includes('"/home/test/.local/share/yplusplus/versions/Yapper App"'));
+  assert.equal(quoteDesktopArg("/tmp/100%"), '" /tmp/100%%"');
   assert.equal(quoteDesktopArg('/tmp/a "quoted" path'), '"/tmp/a \\"quoted\\" path"');
 });
 
@@ -198,7 +200,7 @@ exit 2
     assert.equal(result.status, "installed");
     assert.equal(existsSync(fakeAppImage), true);
     assert.equal(inspectAppDir(result.appDir).patched, true);
-    assert.equal(existsSync(join(dataHome, "yplusplus", "versions", ".yplusplus-extract-")), false);
+    assert.equal(readdirSync(join(dataHome, "yplusplus", "versions")).some((name) => name.startsWith(".yplusplus-extract-")), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
