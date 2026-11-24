@@ -221,3 +221,21 @@ test("refuses plugin execution when Chromium's global sandbox is disabled", asyn
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+
+test("does not read or create a renderer after host cancellation", async () => {
+  FakeWindow.latest = undefined;
+  const directory = await makePluginDirectory();
+  const controller = new AbortController();
+  controller.abort();
+  try {
+    const adapter = createElectronPluginExecutionAdapter(options());
+    await assert.rejects(
+      adapter.start({ ...fixture(), directory }, new ElectronMessagePortAdapter(new FakeNativePort()), controller.signal),
+      /cancelled/,
+    );
+    assert.equal(FakeWindow.latest, undefined);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
