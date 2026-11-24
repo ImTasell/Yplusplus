@@ -24,7 +24,8 @@ const RUNTIME_FILES = [
   "launcher.js",
   "patcher.js",
   "asar.js",
-  "preload-source.js"
+  "preload-source.js",
+  "updater.js"
 ] as const;
 
 export interface ManagedInstallOptions {
