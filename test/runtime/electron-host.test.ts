@@ -7,6 +7,7 @@ import test from "node:test";
 import type { ManagedPlugin } from "../../src/plugins/manager.js";
 import {
   createElectronPluginRuntimeHost,
+  isElectronSandboxDisabled,
   type ElectronPluginRuntimeHostOptions,
 } from "../../src/runtime/electron-host.js";
 import type { ElectronMessageChannelMainLike, ElectronMessagePortMainLike } from "../../src/runtime/electron-message-port.js";
@@ -185,4 +186,11 @@ test("Electron runtime host connects MessageChannel, capability broker, and nati
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+
+test("sandbox detection catches both Electron commandLine and process argv switches", () => {
+  assert.equal(isElectronSandboxDisabled({ commandLine: { hasSwitch: () => true } }, []), true);
+  assert.equal(isElectronSandboxDisabled({ commandLine: { hasSwitch: () => false } }, ["/app", "--no-sandbox"]), true);
+  assert.equal(isElectronSandboxDisabled({ commandLine: { hasSwitch: () => false } }, ["/app"]), false);
 });
