@@ -135,3 +135,16 @@ test("validates startup timeout bounds", () => {
     startupTimeoutMs: 1,
   }), RangeError);
 });
+
+test("unload during startup terminates the late worker handle", async () => {
+  let resolve!: (value: PluginExecutionHandle) => void;
+  const worker = handle();
+  const { runtime } = setup(() => new Promise((done) => { resolve = done; }));
+  const starting = runtime.start(plugin());
+  await Promise.resolve();
+  await runtime.unload("dev.example.runtime");
+  resolve(worker.value);
+  await assert.rejects(starting, /stopped during initialization/);
+  assert.equal(runtime.get("dev.example.runtime")?.state, "UNLOADED");
+  assert.equal(worker.terminated, 1);
+});
