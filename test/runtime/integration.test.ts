@@ -18,6 +18,7 @@ function readyPlugin(): ManagedPlugin {
     version: "1.0.0",
     directory: "/plugins/integration",
     state: "READY",
+    trusted: true,
     requestedPermissions: ["ui.notifications"],
     approvedPermissions: ["ui.notifications"],
     deniedPermissions: [],
