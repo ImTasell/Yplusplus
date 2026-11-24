@@ -223,12 +223,13 @@ export function createElectronPluginExecutionAdapter(
 
   return {
     options,
-    async start(plugin, pluginPort: RpcMessagePort): Promise<PluginExecutionHandle> {
+    async start(plugin, pluginPort: RpcMessagePort, signal?: AbortSignal): Promise<PluginExecutionHandle> {
       if (options.isSandboxDisabled()) {
         throw new Error("Y++ plugin execution is disabled because Chromium was launched with --no-sandbox.");
       }
       const nativePort = getElectronTransferablePort(pluginPort);
       const source = await readPluginEntry(plugin, maxEntryBytes);
+      if (signal?.aborted) throw new Error("Plugin startup was cancelled.");
       const nonce = randomUUID();
       const partition = `yplusplus-plugin-${plugin.id}-${nonce}`;
       const bootstrapUrl = pathToFileURL(options.bootstrapHtmlPath).href;
@@ -281,15 +282,24 @@ export function createElectronPluginExecutionAdapter(
       contents.on("destroyed", () => notifyExit(new Error("Plugin webContents was destroyed.")));
       window.once("closed", () => notifyExit(new Error("Plugin window was closed.")));
 
+      const onAbort = (): void => {
+        notifyExit(new Error("Plugin startup was cancelled by the host."));
+        cleanup();
+      };
+
       const cleanup = (): void => {
         if (disposed) return;
         disposed = true;
+        signal?.removeEventListener("abort", onAbort);
         options.ipcMain.removeListener(READY_CHANNEL, onReady);
         contents.session.webRequest.onBeforeRequest({ urls: ["<all_urls>"] }, null);
         contents.session.setPermissionRequestHandler(null);
         contents.session.setPermissionCheckHandler(null);
         if (!window.isDestroyed()) window.destroy();
       };
+
+      signal?.addEventListener("abort", onAbort, { once: true });
+      if (signal?.aborted) onAbort();
 
       try {
         const startup = (async (): Promise<void> => {
