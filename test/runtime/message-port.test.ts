@@ -55,11 +55,20 @@ test("transports a request over MessageChannel and returns its RPC response", as
 test("handles concurrent messages independently on one port", async () => {
   const { port1, port2 } = new MessageChannel();
   const transport = bindRpcMessagePort(asRpcPort(port1), makeSession());
-  const first = nextMessage(port2);
-  const second = nextMessage(port2);
+  const responsesPromise = new Promise<unknown[]>((resolve) => {
+    const responses: unknown[] = [];
+    const onMessage = (value: unknown) => {
+      responses.push(value);
+      if (responses.length === 2) {
+        port2.off("message", onMessage);
+        resolve(responses);
+      }
+    };
+    port2.on("message", onMessage);
+  });
   port2.postMessage(request("one"));
   port2.postMessage(request("two"));
-  const responses = await Promise.all([first, second]) as Array<{ requestId: string; ok: boolean }>;
+  const responses = await responsesPromise as Array<{ requestId: string; ok: boolean }>;
   assert.deepEqual(responses.map((item) => item.requestId).sort(), ["one", "two"]);
   assert.ok(responses.every((item) => item.ok));
   transport.close();
