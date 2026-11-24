@@ -1,9 +1,9 @@
 /**
  * Example plugin entry contract.
  *
- * The sandbox adapter will provide the frozen window.yplusplus API before
- * evaluating this entry. This file intentionally imports no Electron or Node
- * APIs and demonstrates only the public capability facade.
+ * The sandbox preload provides the frozen globalThis.yplusplus API before
+ * the host imports this entry. This file intentionally imports no Electron or
+ * Node APIs and demonstrates only the public capability facade.
  */
 export async function activate() {
   if (!globalThis.yplusplus?.notifications) {
