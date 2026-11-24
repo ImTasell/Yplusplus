@@ -207,7 +207,7 @@ export function installExtractedAppDir(
     const previousOriginal = readFileSync(backupPath);
     const incomingOriginal = readFileSync(join(sourceAppDir, "resources", "app.asar"));
     if (!previousOriginal.equals(incomingOriginal)) {
-      throw new Error("A different AppImage payload uses this Yapper version number; refusing to replace or silently reuse it.");
+      throw new Error("A different ASAR payload uses this Yapper version number; refusing to replace or silently reuse it.");
     }
     status = "already-installed";
   } else {
