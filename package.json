@@ -10,9 +10,9 @@
   },
   "scripts": {
     "dev": "tsx src/cli.ts",
-    "inspect": "node --experimental-strip-types src/cli.ts inspect",
-    "patch": "node --experimental-strip-types src/cli.ts patch",
-    "restore": "node --experimental-strip-types src/cli.ts restore",
+    "inspect": "tsx src/cli.ts inspect",
+    "patch": "tsx src/cli.ts patch",
+    "restore": "tsx src/cli.ts restore",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc"
