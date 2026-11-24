@@ -103,7 +103,7 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     console.warn("[Y++] Rejected plugin directory:", rejected.directory, rejected.issues);
   }
 
-  let shutdownStarted = false;
+  const managerService = new PluginManagerService({ pluginRoot, approvals, runtime });\n  const managerWindow = createPluginManagerWindow({\n    BrowserWindow: dependencies.BrowserWindow,\n    ipcMain: dependencies.ipcMain,\n    service: managerService,\n  });\n  if (process.argv.includes("--yplusplus-plugin-manager")) {\n    if (isElectronSandboxDisabled(dependencies.app)) {\n      console.error("[Y++] Plugin Manager was not opened because Chromium sandboxing is disabled.");\n    } else {\n      void managerWindow.open().catch((error) => console.error("[Y++] Plugin Manager failed to open:", error));\n    }\n  }\n\n  let shutdownStarted = false;
   let allowQuit = false;
   dependencies.app.on("before-quit", (event) => {
     if (allowQuit) return;
