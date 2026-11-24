@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
 import {
-  copyFileSync,
   cpSync,
   existsSync,
   lstatSync,
@@ -17,7 +16,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BACKUP_SUFFIX, inspectAppDir, patchAppDir } from "./patcher.js";
 
-export const YPLUSPLUS_RUNTIME_VERSION = "0.1.2";
+export const YPLUSPLUS_RUNTIME_VERSION = "0.1.3";
 
 const RUNTIME_FILES = [
   "cli.js",
@@ -74,13 +73,7 @@ function escapeDesktopValue(value: string): string {
 }
 
 export function renderDesktopEntry(nodeExecutable: string, cliPath: string, appDir: string): string {
-  const exec = [
-    nodeExecutable,
-    cliPath,
-    "launch",
-    appDir
-  ].map(quoteDesktopArg).join(" ");
-
+  const exec = [nodeExecutable, cliPath, "launch", appDir].map(quoteDesktopArg).join(" ");
   return [
     "[Desktop Entry]",
     "Type=Application",
@@ -120,7 +113,7 @@ function installRuntime(runtimeParent: string, runtimeSourceDir: string): string
     if (runtimeStat.isSymbolicLink() || !runtimeStat.isDirectory()) {
       throw new Error("Managed Y++ runtime path is not a regular directory.");
     }
-    for (const file of [...RUNTIME_FILES, "package.json"]) {
+    for (const file of [...RUNTIME_FILES, "runtime/bootstrap.js", "package.json"]) {
       const runtimeFile = join(runtimeDir, file);
       if (!existsSync(runtimeFile) || lstatSync(runtimeFile).isSymbolicLink() || !lstatSync(runtimeFile).isFile()) {
         throw new Error(`Managed Y++ runtime is incomplete or unsafe: ${runtimeFile}.`);
@@ -129,7 +122,7 @@ function installRuntime(runtimeParent: string, runtimeSourceDir: string): string
     return runtimeDir;
   }
 
-  for (const file of RUNTIME_FILES) {
+  for (const file of [...RUNTIME_FILES, "runtime/bootstrap.js"]) {
     if (!existsSync(join(runtimeSourceDir, file))) {
       throw new Error(
         `Built Y++ runtime file ${join(runtimeSourceDir, file)} is missing. Run npm run build before installing.`
@@ -139,14 +132,9 @@ function installRuntime(runtimeParent: string, runtimeSourceDir: string): string
 
   const stagingDir = mkdtempSync(join(runtimeParent, `.yplusplus-${YPLUSPLUS_RUNTIME_VERSION}-`));
   try {
-    for (const file of RUNTIME_FILES) {
-      copyFileSync(join(runtimeSourceDir, file), join(stagingDir, file));
-    }
-    const sourceModules = join(runtimeSourceDir, "src");
-    if (!existsSync(sourceModules) || !lstatSync(sourceModules).isDirectory()) {
-      throw new Error("Built Y++ source modules are missing. Run npm run build before installing.");
-    }
-    cpSync(sourceModules, join(stagingDir, "src"), { recursive: true, dereference: false });
+    // tsc's rootDir is the repository root, so executable modules live in
+    // dist/src. Copy that directory's contents as the managed runtime root.
+    cpSync(runtimeSourceDir, stagingDir, { recursive: true, dereference: false });
     writeFileSync(
       join(stagingDir, "package.json"),
       JSON.stringify({
@@ -178,10 +166,8 @@ export function installExtractedAppDir(
   const applicationsDir = resolve(options.applicationsDir ?? join(dataHome, "applications"));
   const nodeExecutable = resolve(options.nodeExecutable ?? process.execPath);
   const moduleDir = dirname(fileURLToPath(import.meta.url));
-  const candidateDistDir = join(moduleDir, "../dist");
-  const runtimeSourceDir = resolve(
-    options.runtimeSourceDir ?? (existsSync(join(candidateDistDir, "cli.js")) ? candidateDistDir : moduleDir)
-  );
+  // When running from dist/src/managed.js, moduleDir is the compiled source root.
+  const runtimeSourceDir = resolve(options.runtimeSourceDir ?? moduleDir);
 
   const sourceAppDir = resolve(extractedAppDir);
   if (!existsSync(sourceAppDir) || !lstatSync(sourceAppDir).isDirectory() || lstatSync(sourceAppDir).isSymbolicLink()) {
