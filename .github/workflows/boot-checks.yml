@@ -82,7 +82,7 @@ jobs:
           APPDIR="/tmp/yplusplus-live/squashfs-root"
           node "$GITHUB_WORKSPACE/dist/src/cli.js" patch "$APPDIR"
 
-          xvfb-run -a node "$GITHUB_WORKSPACE/dist/src/cli.js" launch "$APPDIR" --remote-debugging-port=9222 --remote-allow-origins=* >/tmp/yplusplus-electron.log 2>&1 &
+          xvfb-run -a node "$GITHUB_WORKSPACE/dist/src/cli.js" launch "$APPDIR" --no-sandbox --remote-debugging-port=9222 --remote-allow-origins=* >/tmp/yplusplus-electron.log 2>&1 &
           LAUNCH_PID=$!
           cleanup() {
             kill "$LAUNCH_PID" 2>/dev/null || true
@@ -90,13 +90,23 @@ jobs:
           }
           trap cleanup EXIT
 
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 30); do
             if curl --silent --fail http://127.0.0.1:9222/json >/tmp/yplusplus-targets.json; then
               break
             fi
+            if ! kill -0 "$LAUNCH_PID" 2>/dev/null; then
+              echo "Y++ launcher exited before Chromium DevTools became available."
+              cat /tmp/yplusplus-electron.log || true
+              exit 1
+            fi
             sleep 1
           done
-          test -s /tmp/yplusplus-targets.json
+          if [ ! -s /tmp/yplusplus-targets.json ]; then
+            echo "Chromium DevTools did not become available."
+            cat /tmp/yplusplus-electron.log || true
+            ps -ef | grep -E 'yapper|electron|Xvfb' || true
+            exit 1
+          fi
 
           node --input-type=module <<'NODE'
           const targets = await fetch("http://127.0.0.1:9222/json").then((r) => r.json());
