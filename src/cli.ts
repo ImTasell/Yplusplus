@@ -74,11 +74,11 @@ async function managePlugins(action: string | undefined, args: string[]): Promis
       break;
     case "untrust":
       await controller.untrust(pluginId, pluginVersion!);
-      console.log(`Revoked execution trust for ${pluginId}@${pluginVersion}.`);
+      console.log(`Revoked execution trust for ${pluginId}@${pluginVersion}. It will remain stopped on the next launch.`);
       break;
     case "untrust-all":
       await controller.untrustPlugin(pluginId);
-      console.log(`Revoked execution trust for every release of ${pluginId}.`);
+      console.log(`Revoked execution trust for every release of ${pluginId}. It will remain stopped on the next launch.`);
       break;
     case "approve":
       if (values.length === 0) throw new Error("Specify at least one requested capability to approve.");
