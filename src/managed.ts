@@ -114,13 +114,15 @@ function installRuntime(runtimeParent: string, runtimeSourceDir: string): string
   mkdirSync(runtimeParent, { recursive: true });
 
   if (existsSync(runtimeDir)) {
-    for (const file of RUNTIME_FILES) {
-      if (!existsSync(join(runtimeDir, file))) {
-        throw new Error(`Managed Y++ runtime is incomplete: missing ${join(runtimeDir, file)}.`);
-      }
+    const runtimeStat = lstatSync(runtimeDir);
+    if (runtimeStat.isSymbolicLink() || !runtimeStat.isDirectory()) {
+      throw new Error("Managed Y++ runtime path is not a regular directory.");
     }
-    if (!existsSync(join(runtimeDir, "package.json"))) {
-      throw new Error("Managed Y++ runtime is missing its module package metadata.");
+    for (const file of [...RUNTIME_FILES, "package.json"]) {
+      const runtimeFile = join(runtimeDir, file);
+      if (!existsSync(runtimeFile) || lstatSync(runtimeFile).isSymbolicLink() || !lstatSync(runtimeFile).isFile()) {
+        throw new Error(`Managed Y++ runtime is incomplete or unsafe: ${runtimeFile}.`);
+      }
     }
     return runtimeDir;
   }
