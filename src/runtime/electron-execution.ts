@@ -240,6 +240,9 @@ export function createElectronPluginExecutionAdapter(
   return {
     options,
     async start(plugin, pluginPort: RpcMessagePort, signal?: AbortSignal): Promise<PluginExecutionHandle> {
+      if ((plugin as { readonly trusted?: boolean }).trusted !== true) {
+        throw new Error("Y++ refuses to execute a plugin without explicit host trust.");
+      }
       if (options.isSandboxDisabled()) {
         throw new Error("Y++ plugin execution is disabled because Chromium was launched with --no-sandbox.");
       }
