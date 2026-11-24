@@ -30,7 +30,7 @@ interface ManagerWindow {
 }
 interface ManagerIpcEvent {
   readonly sender: ManagerWebContents;
-  readonly senderFrame?: { readonly url?: string };
+  readonly senderFrame?: { readonly url?: string } | null;
 }
 interface ManagerIpcMain {
   handle(channel: string, listener: (event: ManagerIpcEvent, ...args: unknown[]) => unknown): void;
