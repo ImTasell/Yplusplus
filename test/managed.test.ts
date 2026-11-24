@@ -138,6 +138,8 @@ test("managed install patches atomically, installs its runtime and desktop entry
 
     const desktop = readFileSync(first.desktopFile, "utf8");
     assert.ok(desktop.includes('Exec="/usr/bin/node"'));
+    assert.ok(desktop.includes("Name=Yapin\' (Y++)"));
+    assert.ok(desktop.includes("StartupWMClass=Yapin"));
     assert.ok(desktop.includes('"launch"'));
     assert.ok(desktop.includes(`"${first.appDir}"`));
 
