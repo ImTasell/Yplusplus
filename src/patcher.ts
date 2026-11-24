@@ -69,7 +69,10 @@ export function patchAsarBuffer(archiveBuffer: Buffer): { buffer: Buffer; status
     if (!parsed.header.files[PRELOAD_FILENAME]) {
       throw new Error("Archive contains a Y++ patch marker but the Y++ preload entry is missing.");
     }
-    readAsarFile(parsed, PRELOAD_FILENAME);
+    const existingPreload = readAsarFile(parsed, PRELOAD_FILENAME);
+    if (!existingPreload.equals(preloadSource()) || !mainSource.includes("/* Y++ BOOTSTRAP: END */")) {
+      throw new Error("Archive contains a Y++ marker but its preload or closing marker does not match this bootstrap version.");
+    }
     return { buffer: archiveBuffer, status: "already-patched", version: metadata.version };
   }
 
@@ -154,6 +157,16 @@ export function patchAppDir(appDir: string): PatchResult {
 
   if (!existsSync(backupPath)) {
     copyFileSync(archivePath, backupPath);
+  } else {
+    const backupArchive = parseAsar(readFileSync(backupPath));
+    const backupPackage = JSON.parse(readAsarFile(backupArchive, "package.json").toString("utf8")) as {
+      name?: string;
+      version?: string;
+    };
+    const backupMain = readAsarFile(backupArchive, "main.js").toString("utf8");
+    if (backupPackage.name !== TARGET_PACKAGE_NAME || backupPackage.version !== inspected.version || backupMain.includes(PATCH_MARKER)) {
+      throw new Error("Existing Y++ backup is not a clean original for this Yapper version; refusing to overwrite it.");
+    }
   }
 
   const temporaryPath = archivePath + ".yplusplus-tmp";
@@ -169,10 +182,24 @@ export function patchAppDir(appDir: string): PatchResult {
 }
 
 export function restoreAppDir(appDir: string): string {
-  const archivePath = join(resolve(appDir), "resources", "app.asar");
+  const inspected = inspectAppDir(appDir);
+  const archivePath = inspected.archivePath;
   const backupPath = archivePath + BACKUP_SUFFIX;
   if (!existsSync(backupPath)) {
     throw new Error(`No Y++ backup found at ${backupPath}.`);
+  }
+  if (!inspected.patched) {
+    throw new Error("Current archive does not contain a recognized Y++ patch; refusing to replace it.");
+  }
+
+  const backupArchive = parseAsar(readFileSync(backupPath));
+  const backupPackage = JSON.parse(readAsarFile(backupArchive, "package.json").toString("utf8")) as {
+    name?: string;
+    version?: string;
+  };
+  const backupMain = readAsarFile(backupArchive, "main.js").toString("utf8");
+  if (backupPackage.name !== TARGET_PACKAGE_NAME || backupPackage.version !== inspected.version || backupMain.includes(PATCH_MARKER)) {
+    throw new Error("Y++ backup does not match the current Yapper version or is already patched; refusing to restore.");
   }
 
   const temporaryPath = archivePath + ".yplusplus-restore-tmp";
