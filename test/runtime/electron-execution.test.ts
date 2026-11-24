@@ -114,6 +114,7 @@ function fixture(): ManagedPlugin {
     directory: "/unused",
     entry: "index.js",
     state: "READY",
+    trusted: true,
     requestedPermissions: ["ui.notifications"],
     approvedPermissions: ["ui.notifications"],
     deniedPermissions: [],
