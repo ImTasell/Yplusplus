@@ -124,3 +124,31 @@ test("client exposes settings get and set through RPC", async () => {
   client.close();
   host.close();
 });
+
+
+test("client receives host settings changes and unsubscribes on disposer", async () => {
+  const channel = new MessageChannel();
+  const host = port(channel.port1);
+  const client = createPluginApiClient(port(channel.port2));
+  let subscriptionId = "";
+  host.addEventListener("message", (event) => {
+    const request = event.data as { requestId: string; method: string; payload: { key: string } };
+    if (request.method === "settings.subscribe") subscriptionId = request.payload.key;
+    host.postMessage({ rpcVersion: 1, type: "response", requestId: request.requestId, ok: true, result: null });
+  });
+  host.start();
+  const values: unknown[] = [];
+  const dispose = client.settings.onChange<number>("scale", (value) => values.push(value));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  host.postMessage({
+    rpcVersion: 1, type: "event", event: "settings.change",
+    payload: { key: "scale", value: 1.5 },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(subscriptionId, "scale");
+  assert.deepEqual(values, [1.5]);
+  dispose();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  client.close();
+  host.close();
+});
