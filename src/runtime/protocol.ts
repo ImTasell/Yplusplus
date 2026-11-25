@@ -104,8 +104,16 @@ export function parseRpcRequest(input: unknown): RpcRequest {
     if (Object.keys(payload).sort().join(",") !== "defaultValue,key" || typeof payload.key !== "string" || !settingValue(payload.defaultValue)) throw new RpcProtocolError("INVALID_MESSAGE", "Settings get payload must contain a string key and primitive defaultValue.");
   } else if (copied.method === "settings.set") {
     if (Object.keys(payload).sort().join(",") !== "key,value" || typeof payload.key !== "string" || !settingValue(payload.value)) throw new RpcProtocolError("INVALID_MESSAGE", "Settings set payload must contain a string key and primitive value.");
-  } else if (Object.keys(payload).sort().join(",") !== "key" || typeof payload.key !== "string") {
-    throw new RpcProtocolError("INVALID_MESSAGE", "Settings subscription payload must contain only a string key.");
+  } else if (copied.method === "settings.subscribe" || copied.method === "settings.unsubscribe") {
+    if (Object.keys(payload).sort().join(",") !== "key" || typeof payload.key !== "string") {
+      throw new RpcProtocolError("INVALID_MESSAGE", "Settings subscription payload must contain only a string key.");
+    }
+  } else if (copied.method === "ui.settingsPanel.register") {
+    if (Object.keys(payload).sort().join(",") !== "panel" || !record(payload.panel)) {
+      throw new RpcProtocolError("INVALID_MESSAGE", "Settings panel registration requires a panel object.");
+    }
+  } else if (Object.keys(payload).sort().join(",") !== "panelId" || typeof payload.panelId !== "string") {
+    throw new RpcProtocolError("INVALID_MESSAGE", "Settings panel unregistration requires a string panelId.");
   }
   return Object.freeze({
     rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: copied.requestId,
