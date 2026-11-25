@@ -156,10 +156,12 @@ try {
       if (!page || !selected) return;
       const token = ++refreshToken;
       page.replaceChildren();
-      const header = element("div", "ss2-page");
-      header.append(element("h2", "", "Plugins"));
-      header.append(element("p", "hint", "Installed Y++ plugins and their settings."));
-      page.append(header);
+      const heading = element("h2", "", "Plugins");
+      const intro = element("p", "hint", "Installed Y++ plugins and their settings.");
+      const refresh = element("button", "btn small", "Refresh");
+      refresh.type = "button";
+      refresh.addEventListener("click", () => { void renderSettings(); });
+      page.append(heading, intro, refresh);
       try {
         const snapshot = await settingsPage.refresh();
         if (token !== refreshToken || !selected || !page) return;
@@ -227,7 +229,7 @@ try {
         nav.insertBefore(navButton, developer || null);
       }
       if (!page || !page.isConnected || page.parentElement !== main) {
-        page = element("section", "settings-main-yplusplus");
+        page = element("section", "ss2-page yplusplus-settings-page");
         page.hidden = true;
         main.append(page);
       }
