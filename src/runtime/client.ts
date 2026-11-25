@@ -2,10 +2,12 @@
  * Plugin-side, capability-only Y++ API client. No Node/Electron imports.
  */
 import type { RpcMessagePort } from "./message-port.js";
+import type { SettingsPanelDefinition } from "../plugins/api.js";
 import { YPLUSPLUS_RPC_VERSION, type RpcResponse, type RpcSettingValue, type RpcSettingsChangeEvent } from "./protocol.js";
 export interface PluginApiClientOptions { readonly requestTimeoutMs?: number; readonly maxPendingRequests?: number; }
 export interface PluginApi {
   readonly notifications: { show(request: { readonly title: string; readonly message: string }): Promise<void>; };
+  readonly ui: { registerSettingsPanel(panel: SettingsPanelDefinition): () => void; };
   readonly settings: {
     get<T extends RpcSettingValue>(key: string, defaultValue: T): Promise<T>;
     set<T extends RpcSettingValue>(key: string, value: T): Promise<void>;
@@ -127,6 +129,23 @@ export function createPluginApiClient(port: RpcMessagePort, options: PluginApiCl
       return request("capabilities.notifications.show", { title: input.title, message: input.message }).then(() => undefined);
     } }),
     settings,
+    ui: Object.freeze({
+      registerSettingsPanel: (panel: SettingsPanelDefinition): (() => void) => {
+        if (typeof panel !== "object" || panel === null || typeof panel.id !== "string") {
+          throw new PluginApiError("INVALID_ARGUMENT", "A settings panel definition is required.");
+        }
+        let disposed = false;
+        const registration = request("ui.settingsPanel.register", { panel: panel as unknown as Record<string, unknown> });
+        void registration.then(() => {
+          if (disposed) void request("ui.settingsPanel.unregister", { panelId: panel.id }).catch(() => undefined);
+        }).catch(() => undefined);
+        return () => {
+          if (disposed) return;
+          disposed = true;
+          void registration.then(() => request("ui.settingsPanel.unregister", { panelId: panel.id })).catch(() => undefined);
+        };
+      },
+    }),
     close,
   });
 }
