@@ -3,15 +3,19 @@
  */
 import type { ManagedPlugin, PluginApprovalProvider } from "../plugins/manager.js";
 import type { PluginSettingsStore, PluginSettingValue } from "../plugins/plugin-settings-store.js";
+import type { PluginSettingsPanelRegistry } from "../plugins/plugin-settings-panel-registry.js";
+import type { SettingsPanelDefinition } from "../plugins/api.js";
 export interface NotificationRequest { readonly title: string; readonly message: string; }
 export type NotificationAdapter = (plugin: Readonly<{ id: string; version: string }>, request: NotificationRequest) => void | Promise<void>;
 export interface CapabilityBrokerOptions {
   readonly getApprovedPermissions: PluginApprovalProvider;
   readonly notifications: NotificationAdapter;
   readonly settingsStore?: PluginSettingsStore;
+  readonly settingsPanelRegistry?: PluginSettingsPanelRegistry;
 }
 export interface PluginCapabilityFacade {
   readonly notifications?: Readonly<{ show(request: NotificationRequest): Promise<void> }>;
+  readonly ui?: Readonly<{ registerSettingsPanel(panel: SettingsPanelDefinition): () => void }>;
   readonly settings?: Readonly<{
     get(key: string, defaultValue: PluginSettingValue): Promise<PluginSettingValue>;
     set(key: string, value: PluginSettingValue): Promise<void>;
@@ -49,6 +53,10 @@ export async function createPluginCapabilityFacade(plugin: ManagedPlugin, option
       if (!current.has("ui.notifications")) throw new CapabilityDeniedError("ui.notifications", "The host has not approved this capability or its approval was revoked.");
       await options.notifications(Object.freeze({ id: plugin.id, version: plugin.version }), normalizeNotification(input));
     } });
+  }
+  if (options.settingsPanelRegistry) {
+    const pluginId = plugin.id;
+    facade.ui = Object.freeze({ registerSettingsPanel: (panel: SettingsPanelDefinition) => options.settingsPanelRegistry!.register(pluginId, panel) });
   }
   if (options.settingsStore) {
     // The plugin ID is captured from the trusted manager snapshot, never RPC input.
