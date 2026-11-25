@@ -68,7 +68,7 @@ export class PluginRpcSession {
     if (request.method === "capabilities.notifications.show") {
       const show = this.#facade.notifications?.show;
       if (!show) return rpcFailure(request.requestId, "CAPABILITY_DENIED", "ui.notifications is not available to this plugin.");
-      operation = Promise.resolve().then(() => show(request.payload as { title: string; message: string })).then(() => null);
+      operation = Promise.resolve().then(() => show({ title: request.payload.title as string, message: request.payload.message as string })).then(() => null);
     } else {
       const settings = this.#facade.settings;
       if (!settings) return rpcFailure(request.requestId, "CAPABILITY_DENIED", "Plugin settings are not available to this plugin.");
