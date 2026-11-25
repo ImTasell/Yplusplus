@@ -130,25 +130,28 @@ test("client receives host settings changes and unsubscribes on disposer", async
   const channel = new MessageChannel();
   const host = port(channel.port1);
   const client = createPluginApiClient(port(channel.port2));
-  let subscriptionId = "";
+  let resolveSubscribed!: () => void;
+  let resolveUnsubscribed!: () => void;
+  const subscribed = new Promise<void>((resolve) => { resolveSubscribed = resolve; });
+  const unsubscribed = new Promise<void>((resolve) => { resolveUnsubscribed = resolve; });
   host.addEventListener("message", (event) => {
     const request = event.data as { requestId: string; method: string; payload: { key: string } };
-    if (request.method === "settings.subscribe") subscriptionId = request.payload.key;
+    if (request.method === "settings.subscribe") resolveSubscribed();
+    if (request.method === "settings.unsubscribe") resolveUnsubscribed();
     host.postMessage({ rpcVersion: 1, type: "response", requestId: request.requestId, ok: true, result: null });
   });
   host.start();
   const values: unknown[] = [];
   const dispose = client.settings.onChange<number>("scale", (value) => values.push(value));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await subscribed;
   host.postMessage({
     rpcVersion: 1, type: "event", event: "settings.change",
     payload: { key: "scale", value: 1.5 },
   });
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(subscriptionId, "scale");
   assert.deepEqual(values, [1.5]);
   dispose();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await unsubscribed;
   client.close();
   host.close();
 });
