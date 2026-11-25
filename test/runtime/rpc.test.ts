@@ -236,3 +236,53 @@ test("settings subscriptions emit host changes and dispose on session close", as
   assert.equal(disposed, 1);
   assert.equal(listeners.size, 0);
 });
+
+
+test("parses declarative settings panel registration and removal RPC", () => {
+  const panel = { id: "general", title: "General", items: [{ type: "toggle", id: "enabled", label: "Enabled", defaultValue: true }] };
+  const parsed = parseRpcRequest({
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: "panel_register",
+    method: "ui.settingsPanel.register", payload: { panel },
+  });
+  assert.equal(parsed.method, "ui.settingsPanel.register");
+  assert.throws(() => parseRpcRequest({
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: "panel_bad",
+    method: "ui.settingsPanel.unregister", payload: { panel: {} },
+  }), /panelId/);
+});
+
+test("registers settings panels through the host facade and disposes on session close", async () => {
+  const registered: unknown[] = [];
+  let disposed = 0;
+  const session = new PluginRpcSession({ facade: { ui: {
+    registerSettingsPanel(panel) {
+      registered.push(panel);
+      return () => { disposed += 1; };
+    },
+  } } });
+  const panel = { id: "general", title: "General", items: [] };
+  const result = await session.dispatch({
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: "panel_register",
+    method: "ui.settingsPanel.register", payload: { panel },
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(registered, [panel]);
+  session.close();
+  assert.equal(disposed, 1);
+});
+
+test("rejects duplicate settings panel registrations within one RPC session", async () => {
+  let calls = 0;
+  const session = new PluginRpcSession({ facade: { ui: {
+    registerSettingsPanel() { calls += 1; return () => undefined; },
+  } } });
+  const makeRequest = (requestId: string) => ({
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId,
+    method: "ui.settingsPanel.register", payload: { panel: { id: "general", title: "General", items: [] } },
+  });
+  assert.equal((await session.dispatch(makeRequest("panel_one"))).ok, true);
+  const duplicate = await session.dispatch(makeRequest("panel_two"));
+  assert.equal(duplicate.ok, false);
+  assert.equal(calls, 1);
+  session.close();
+});
