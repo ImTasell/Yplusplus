@@ -77,7 +77,7 @@ function makeRuntimeSource(dir: string): void {
     writeFileSync(join(dir, file), "// runtime fixture\n");
   }
   mkdirSync(join(dir, "runtime", "assets"), { recursive: true });
-  for (const file of ["bootstrap.js", "plugin-manager-service.js", "plugin-manager-window.js"]) {
+  for (const file of ["bootstrap.js", "plugin-manager-service.js", "plugin-settings-page-ipc.js", "plugin-manager-window.js"]) {
     writeFileSync(join(dir, "runtime", file), "// runtime fixture\n");
   }
   for (const file of ["plugin-host.html", "plugin-manager.html", "plugin-manager.css", "plugin-manager-renderer.js", "plugin-manager-preload.cjs", "plugin-preload.cjs"]) {
