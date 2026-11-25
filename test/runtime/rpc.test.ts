@@ -178,6 +178,7 @@ test("dispatches settings get and set through the plugin-bound facade", async ()
     settings: {
       async get(key, fallback) { return values.has(key) ? values.get(key)! : fallback; },
       async set(key, value) { values.set(key, value); },
+      subscribe() { return () => undefined; },
     },
   } });
   const get = await session.dispatch({
