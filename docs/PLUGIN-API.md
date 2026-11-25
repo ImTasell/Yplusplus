@@ -153,16 +153,21 @@ assume backward compatibility automatically.
 
 ## Implementation status
 
-This document is the API-1 target contract, not a claim that every method is
-already wired into the runtime. Notifications and plugin-scoped persistent
-settings are now wired through the host-owned RPC facade. `settings.get`,
-`settings.set`, and `settings.onChange` use the store in
-`src/plugins/plugin-settings-store.ts`; host change events are delivered over
-the plugin MessagePort, and subscriptions are disposed when the RPC session
-closes. Settings-panel definitions are now validated by the host-owned registry
-and registered/unregistered over plugin RPC. Registrations are scoped to the
-authenticated plugin ID and disposed when its RPC session closes. Trusted Yapin
-Settings rendering, logging, and application lifecycle events remain follow-on
-implementation batches. The
-public `src/plugins/api.ts` contract remains the source of truth for the full
-API-1 target surface.
+This document describes the API-1 target contract; not every namespace is
+implemented yet. Notifications and plugin-scoped persistent settings are wired
+through the host-owned RPC facade. `settings.get`, `settings.set`, and
+`settings.onChange` use `src/plugins/plugin-settings-store.ts`; subscriptions
+are disposed when the RPC session closes.
+
+Settings-panel definitions are validated by the host-owned registry and
+registered/unregistered over plugin RPC. The native Yapin Settings integration
+adds a Plugins navigation entry and renders the host-validated toggle, text,
+number, and select controls inside the existing Settings modal. Its IPC surface
+is read/write-only and validates the requesting main frame, registered panel,
+item identity, and value type/range. It does not expose plugin trust, approval,
+or lifecycle actions to the remote renderer. Settings values are persisted by
+the host, and panel registrations disappear when their plugin session closes.
+
+Logging and application lifecycle events remain follow-on implementation
+batches. The public `src/plugins/api.ts` contract remains the source of truth
+for the full API-1 target surface.
