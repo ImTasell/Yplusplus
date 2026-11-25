@@ -42,7 +42,7 @@ export async function createPluginCapabilityFacade(plugin: ManagedPlugin, option
   }
   const requested = new Set(plugin.requestedPermissions);
   const approved = await options.getApprovedPermissions(plugin.id, plugin.version);
-  const facade: { notifications?: PluginCapabilityFacade["notifications"]; settings?: PluginCapabilityFacade["settings"] } = {};
+  const facade: { notifications?: NonNullable<PluginCapabilityFacade["notifications"]>; settings?: NonNullable<PluginCapabilityFacade["settings"]> } = {};
   if (requested.has("ui.notifications") && approved.has("ui.notifications")) {
     facade.notifications = Object.freeze({ show: async (input: NotificationRequest) => {
       const current = await options.getApprovedPermissions(plugin.id, plugin.version);
