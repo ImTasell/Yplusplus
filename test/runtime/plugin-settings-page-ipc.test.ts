@@ -61,7 +61,7 @@ test("native settings IPC exposes only registered plugin settings and validates 
       /no longer available/,
     );
     await assert.rejects(
-      Promise.resolve(get({ sender, senderFrame: event.senderFrame }, "dev.example.plugin", "general", "enabled")),
+      Promise.resolve(get({ sender, senderFrame: { url: "https://yapper.website/settings" } }, "dev.example.plugin", "general", "enabled")),
       /Unauthorized/,
     );
   } finally {
