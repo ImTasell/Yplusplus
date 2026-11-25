@@ -95,7 +95,7 @@ export function parseRpcRequest(input: unknown): RpcRequest {
   if (copied.rpcVersion !== YPLUSPLUS_RPC_VERSION) throw new RpcProtocolError("UNSUPPORTED_VERSION", "Unsupported Y++ RPC protocol version.");
   if (copied.type !== "request") throw new RpcProtocolError("INVALID_MESSAGE", "Expected an RPC request envelope.");
   if (typeof copied.requestId !== "string" || !/^[a-zA-Z0-9_-]{1,64}$/.test(copied.requestId)) throw new RpcProtocolError("INVALID_MESSAGE", "Invalid RPC request ID.");
-  if (copied.method !== "capabilities.notifications.show" && copied.method !== "settings.get" && copied.method !== "settings.set") throw new RpcProtocolError("UNKNOWN_METHOD", "RPC method is not supported.");
+  if (copied.method !== "capabilities.notifications.show" && copied.method !== "settings.get" && copied.method !== "settings.set" && copied.method !== "settings.subscribe" && copied.method !== "settings.unsubscribe") throw new RpcProtocolError("UNKNOWN_METHOD", "RPC method is not supported.");
   if (!record(copied.payload)) throw new RpcProtocolError("INVALID_MESSAGE", "RPC payload must be an object.");
   const payload = copied.payload;
   if (copied.method === "capabilities.notifications.show") {
