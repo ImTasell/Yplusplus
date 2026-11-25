@@ -209,3 +209,29 @@ test("denies settings RPC when no host settings facade is bound", async () => {
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.error.code, "CAPABILITY_DENIED");
 });
+
+
+test("settings subscriptions emit host changes and dispose on session close", async () => {
+  const listeners = new Map<string, (value: string | number | boolean) => void>();
+  let disposed = 0;
+  const session = new PluginRpcSession({ facade: { settings: {
+    async get(_key, fallback) { return fallback; },
+    async set() {},
+    subscribe(key, listener) { listeners.set(key, listener); return () => { listeners.delete(key); disposed += 1; }; },
+  } } });
+  const events: unknown[] = [];
+  session.setEventSink((event) => events.push(event));
+  const result = await session.dispatch({
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: "subscribe_1",
+    method: "settings.subscribe", payload: { key: "density" },
+  });
+  assert.equal(result.ok, true);
+  listeners.get("density")?.(42);
+  assert.deepEqual(events, [{
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "event", event: "settings.change",
+    payload: { key: "density", value: 42 },
+  }]);
+  session.close();
+  assert.equal(disposed, 1);
+  assert.equal(listeners.size, 0);
+});
