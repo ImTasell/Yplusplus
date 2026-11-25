@@ -15,6 +15,7 @@ export interface PluginCapabilityFacade {
   readonly settings?: Readonly<{
     get(key: string, defaultValue: PluginSettingValue): Promise<PluginSettingValue>;
     set(key: string, value: PluginSettingValue): Promise<void>;
+    subscribe(key: string, listener: (value: PluginSettingValue) => void): () => void;
   }>;
 }
 export class CapabilityDeniedError extends Error {
@@ -55,6 +56,7 @@ export async function createPluginCapabilityFacade(plugin: ManagedPlugin, option
     facade.settings = Object.freeze({
       get: (key: string, defaultValue: PluginSettingValue) => options.settingsStore!.get(pluginId, key, defaultValue),
       set: (key: string, value: PluginSettingValue) => options.settingsStore!.set(pluginId, key, value),
+      subscribe: (key: string, listener: (value: PluginSettingValue) => void) => options.settingsStore!.subscribe(pluginId, key, listener),
     });
   }
   return Object.freeze(facade);
