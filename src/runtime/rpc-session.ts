@@ -2,7 +2,7 @@
  * Host-side RPC dispatcher for one host-authenticated plugin session.
  */
 import type { PluginCapabilityFacade } from "../capabilities/broker.js";
-import { parseRpcRequest, rpcFailure, rpcSuccess, RpcProtocolError, type RpcResponse, type RpcSettingValue } from "./protocol.js";
+import { parseRpcRequest, rpcFailure, rpcSuccess, RpcProtocolError, YPLUSPLUS_RPC_VERSION, type RpcResponse, type RpcSettingValue, type RpcSettingsChangeEvent } from "./protocol.js";
 export interface PluginRpcSessionOptions {
   readonly facade: PluginCapabilityFacade;
   readonly maxConcurrentRequests?: number;
@@ -14,6 +14,9 @@ export class PluginRpcSession {
   readonly #timeoutMs: number;
   readonly #seenRequestIds = new Set<string>();
   #inFlight = 0;
+  readonly #subscriptions = new Map<string, () => void>();
+  #eventSink: ((event: RpcSettingsChangeEvent) => void) | undefined;
+  #closed = false;
   constructor(options: PluginRpcSessionOptions) {
     this.#facade = options.facade;
     this.#maxConcurrent = options.maxConcurrentRequests ?? 8;
@@ -22,6 +25,8 @@ export class PluginRpcSession {
     if (!Number.isSafeInteger(this.#timeoutMs) || this.#timeoutMs < 50 || this.#timeoutMs > 60_000) throw new RangeError("requestTimeoutMs must be an integer from 50 to 60000.");
   }
   get inFlightRequests(): number { return this.#inFlight; }
+  setEventSink(sink: ((event: RpcSettingsChangeEvent) => void) | undefined): void { this.#eventSink = sink; }
+  close(): void { if (this.#closed) return; this.#closed = true; this.#eventSink = undefined; for (const dispose of this.#subscriptions.values()) dispose(); this.#subscriptions.clear(); }
   async dispatch(input: unknown): Promise<RpcResponse> {
     let request;
     try { request = parseRpcRequest(input); }
@@ -29,10 +34,35 @@ export class PluginRpcSession {
       if (error instanceof RpcProtocolError) return rpcFailure("invalid", error.code, error.message);
       return rpcFailure("invalid", "INVALID_MESSAGE", "Unable to parse RPC request.");
     }
+    if (this.#closed) return rpcFailure(request.requestId, "CAPABILITY_DENIED", "The plugin RPC session is closed.");
     if (this.#seenRequestIds.has(request.requestId)) return rpcFailure(request.requestId, "INVALID_MESSAGE", "Duplicate request ID.");
     if (this.#seenRequestIds.size >= 4096) return rpcFailure(request.requestId, "RATE_LIMITED", "RPC session request budget exhausted; create a new session.");
     this.#seenRequestIds.add(request.requestId);
     if (this.#inFlight >= this.#maxConcurrent) return rpcFailure(request.requestId, "RATE_LIMITED", "Too many concurrent plugin requests.");
+
+    if (request.method === "settings.subscribe" || request.method === "settings.unsubscribe") {
+      const settings = this.#facade.settings;
+      if (!settings) return rpcFailure(request.requestId, "CAPABILITY_DENIED", "Plugin settings are not available to this plugin.");
+      const key = request.payload.key as string;
+      if (request.method === "settings.subscribe") {
+        if (!this.#subscriptions.has(key)) {
+          const dispose = settings.subscribe(key, (value) => {
+            if (this.#closed || !this.#eventSink) return;
+            try {
+              this.#eventSink(Object.freeze({
+                rpcVersion: YPLUSPLUS_RPC_VERSION, type: "event", event: "settings.change",
+                payload: Object.freeze({ key, value }),
+              }));
+            } catch { /* transport closure is handled by its owner */ }
+          });
+          this.#subscriptions.set(key, dispose);
+        }
+      } else {
+        this.#subscriptions.get(key)?.();
+        this.#subscriptions.delete(key);
+      }
+      return rpcSuccess(request.requestId);
+    }
 
     let operation: Promise<RpcSettingValue | null>;
     if (request.method === "capabilities.notifications.show") {
