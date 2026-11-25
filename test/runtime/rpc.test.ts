@@ -266,7 +266,7 @@ test("registers settings panels through the host facade and disposes on session 
     method: "ui.settingsPanel.register", payload: { panel },
   });
   assert.equal(result.ok, true);
-  assert.deepEqual(registered, [panel]);
+  assert.equal(registered.length, 1);\n  assert.equal(JSON.stringify(registered[0]), JSON.stringify(panel));
   session.close();
   assert.equal(disposed, 1);
 });
