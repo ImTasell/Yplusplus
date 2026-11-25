@@ -17,7 +17,7 @@ function text(value: unknown, label: string, max: number, optional = false): str
   }
   return value.trim();
 }
-function identifier(value: unknown, label: string): string {
+function onlyKeys(value: Record<string, unknown>, allowed: readonly string[], label: string): void {\n  if (Object.keys(value).some((key) => !allowed.includes(key))) throw new TypeError(`${label} contains unsupported fields.`);\n}\nfunction identifier(value: unknown, label: string): string {
   if (typeof value !== "string" || !ID.test(value)) throw new TypeError(`Invalid ${label}.`);
   return value;
 }
@@ -70,7 +70,7 @@ export function validateSettingsPanel(input: unknown): SettingsPanelDefinition {
   const description = text(panel.description, "Settings panel description", 240, true);
   const icon = text(panel.icon, "Settings panel icon", 32, true);
   if (icon !== undefined && !ICONS.has(icon)) throw new TypeError("Unsupported settings panel icon.");
-  if (!Array.isArray(panel.items) || panel.items.length > 64) throw new TypeError("Settings panels may contain at most 64 items.");
+  if (!Array.isArray(panel.items) || panel.items.length < 1 || panel.items.length > 64) throw new TypeError("Settings panels must contain 1–64 items.");
   const items = panel.items.map(validateItem);
   if (new Set(items.map((item) => item.id)).size !== items.length) throw new TypeError("Settings panel item IDs must be unique.");
   const result = { id, title, items: Object.freeze(items), ...(description === undefined ? {} : { description }), ...(icon === undefined ? {} : { icon }) };
