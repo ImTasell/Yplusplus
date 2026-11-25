@@ -155,7 +155,10 @@ assume backward compatibility automatically.
 
 This document is the API-1 target contract, not a claim that every method is
 already wired into the runtime. The existing notification capability is the
-first working API operation. Settings storage, settings-panel RPC and trusted
-Yapin Settings rendering, logging, and application events are follow-on
-implementation batches. Keep the public signatures stable while those host
-services are implemented and tested.
+first working API operation. A host-owned plugin-scoped settings persistence
+primitive and its tests now exist in `src/plugins/plugin-settings-store.ts`;
+it is not yet connected to plugin RPC or the public `api.settings` facade.
+Settings RPC/subscriptions, settings-panel RPC and trusted Yapin Settings
+rendering, logging, and application events remain follow-on implementation
+batches. Keep the public signatures stable while those host services are
+implemented and tested.
