@@ -8,6 +8,7 @@
 import { createPluginCapabilityFacade } from "../capabilities/broker.js";
 import type { PluginApprovalProvider } from "../plugins/manager.js";
 import type { PluginSettingsStore } from "../plugins/plugin-settings-store.js";
+import type { PluginSettingsPanelRegistry } from "../plugins/plugin-settings-panel-registry.js";
 import { PluginRpcSession } from "./rpc-session.js";
 import { PluginRuntimeHost } from "./host.js";
 import {
@@ -51,6 +52,7 @@ export interface ElectronPluginRuntimeHostOptions {
   readonly getApprovedPermissions: PluginApprovalProvider;
   /** Shared host-owned persistent settings store; plugin identity is bound internally. */
   readonly settingsStore: PluginSettingsStore;
+  readonly settingsPanelRegistry?: PluginSettingsPanelRegistry;
   /** Must detect --no-sandbox in the actual parent Electron/Chromium process. */
   readonly isSandboxDisabled: () => boolean;
   readonly preloadPath?: string;
@@ -87,6 +89,7 @@ export function createElectronPluginRuntimeHost(
       const facade = await createPluginCapabilityFacade(plugin, {
         getApprovedPermissions: options.getApprovedPermissions,
         settingsStore: options.settingsStore,
+        ...(options.settingsPanelRegistry ? { settingsPanelRegistry: options.settingsPanelRegistry } : {}),
         notifications: async (_identity, request) => {
           const notification = new options.Notification({
             title: request.title,
