@@ -69,6 +69,10 @@ try {
     let refreshToken = 0;
 
     const showPluginPage = async () => {
+      if (selected && page && page.isConnected && !page.hidden) {
+        await renderSettings();
+        return;
+      }
       selected = true;
       const modal = document.querySelector('.modal[aria-label="User settings"]');
       const nav = modal && modal.querySelector(".settings-nav");
