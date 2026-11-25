@@ -136,9 +136,6 @@ export function createPluginApiClient(port: RpcMessagePort, options: PluginApiCl
         }
         let disposed = false;
         const registration = request("ui.settingsPanel.register", { panel: panel as unknown as Record<string, unknown> });
-        void registration.then(() => {
-          if (disposed) void request("ui.settingsPanel.unregister", { panelId: panel.id }).catch(() => undefined);
-        }).catch(() => undefined);
         return () => {
           if (disposed) return;
           disposed = true;
