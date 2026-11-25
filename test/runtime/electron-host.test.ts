@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import type { ManagedPlugin } from "../../src/plugins/manager.js";
+import { PluginSettingsStore } from "../../src/plugins/plugin-settings-store.js";
 import {
   createElectronPluginRuntimeHost,
   isElectronSandboxDisabled,
@@ -171,6 +172,7 @@ test("Electron runtime host connects MessageChannel, capability broker, and nati
       MessageChannelMain: Channel,
       Notification,
       getApprovedPermissions: async () => new Set(["ui.notifications"]),
+      settingsStore: new PluginSettingsStore({ directory: path.join(directory, "settings") }),
       isSandboxDisabled: () => false,
       preloadPath: "/runtime/plugin-preload.cjs",
       bootstrapHtmlPath: "/runtime/plugin-host.html",
