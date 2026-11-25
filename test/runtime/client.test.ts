@@ -162,21 +162,29 @@ test("client registers declarative settings panels and returns an unregister dis
   const host = port(channel.port1);
   const client = createPluginApiClient(port(channel.port2));
   const seen: Array<{ method: string; payload: unknown }> = [];
+  let resolveUnregistered!: () => void;
+  const unregistered = new Promise<void>((resolve) => { resolveUnregistered = resolve; });
   host.addEventListener("message", (event) => {
     const request = event.data as { requestId: string; method: string; payload: unknown };
     seen.push({ method: request.method, payload: request.payload });
     host.postMessage({ rpcVersion: 1, type: "response", requestId: request.requestId, ok: true, result: null });
+    if (request.method === "ui.settingsPanel.unregister") resolveUnregistered();
   });
   host.start();
-  const panel = { id: "general", title: "General", items: [{ type: "toggle" as const, id: "enabled", label: "Enabled", defaultValue: true }] };
-  const dispose = client.ui.registerSettingsPanel(panel);
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  dispose();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.deepEqual(seen, [
-    { method: "ui.settingsPanel.register", payload: { panel } },
-    { method: "ui.settingsPanel.unregister", payload: { panelId: "general" } },
-  ]);
-  client.close();
-  host.close();
+  try {
+    const panel = { id: "general", title: "General", items: [{ type: "toggle" as const, id: "enabled", label: "Enabled", defaultValue: true }] };
+    const dispose = client.ui.registerSettingsPanel(panel);
+    dispose();
+    await Promise.race([
+      unregistered,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Unregister RPC was not sent")), 1_000)),
+    ]);
+    assert.deepEqual(seen, [
+      { method: "ui.settingsPanel.register", payload: { panel } },
+      { method: "ui.settingsPanel.unregister", payload: { panelId: "general" } },
+    ]);
+  } finally {
+    client.close();
+    host.close();
+  }
 });
