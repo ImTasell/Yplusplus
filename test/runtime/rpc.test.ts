@@ -151,3 +151,61 @@ test("timed-out operations retain concurrency slots until they actually settle",
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(session.inFlightRequests, 0);
 });
+
+
+test("parses settings get and set requests with primitive values", () => {
+  const get = parseRpcRequest({
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: "get_1",
+    method: "settings.get", payload: { key: "theme", defaultValue: "dark" },
+  });
+  assert.equal(get.method, "settings.get");
+  assert.equal(get.payload.key, "theme");
+  const set = parseRpcRequest({
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: "set_1",
+    method: "settings.set", payload: { key: "scale", value: 1.25 },
+  });
+  assert.equal(set.method, "settings.set");
+  assert.equal(set.payload.value, 1.25);
+  assert.throws(() => parseRpcRequest({
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: "bad_1",
+    method: "settings.set", payload: { key: "x", value: Number.NaN },
+  }), /non-JSON|primitive/);
+});
+
+test("dispatches settings get and set through the plugin-bound facade", async () => {
+  const values = new Map<string, string | number | boolean>();
+  const session = new PluginRpcSession({ facade: {
+    settings: {
+      async get(key, fallback) { return values.has(key) ? values.get(key)! : fallback; },
+      async set(key, value) { values.set(key, value); },
+    },
+  } });
+  const get = await session.dispatch({
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: "settings_get",
+    method: "settings.get", payload: { key: "mode", defaultValue: "default" },
+  });
+  assert.equal(get.ok, true);
+  if (get.ok) assert.equal(get.result, "default");
+  const set = await session.dispatch({
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: "settings_set",
+    method: "settings.set", payload: { key: "mode", value: "compact" },
+  });
+  assert.equal(set.ok, true);
+  assert.equal(values.get("mode"), "compact");
+  const updated = await session.dispatch({
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: "settings_get2",
+    method: "settings.get", payload: { key: "mode", defaultValue: "default" },
+  });
+  assert.equal(updated.ok, true);
+  if (updated.ok) assert.equal(updated.result, "compact");
+});
+
+test("denies settings RPC when no host settings facade is bound", async () => {
+  const session = new PluginRpcSession({ facade: {} });
+  const result = await session.dispatch({
+    rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: "settings_denied",
+    method: "settings.get", payload: { key: "x", defaultValue: false },
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.error.code, "CAPABILITY_DENIED");
+});
