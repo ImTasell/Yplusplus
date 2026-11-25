@@ -147,6 +147,22 @@ ipcRenderer.on(CONNECT_CHANNEL, (event, payload) => {
         }).then(() => undefined);
       }
     }),
+    ui: Object.freeze({
+      registerSettingsPanel: (panel) => {
+        if (!panel || typeof panel !== "object" || Array.isArray(panel) ||
+            typeof panel.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(panel.id)) {
+          throw new TypeError("Invalid Y++ settings panel definition.");
+        }
+        let disposed = false;
+        const registration = request("ui.settingsPanel.register", { panel });
+        void registration.catch(() => undefined);
+        return () => {
+          if (disposed) return;
+          disposed = true;
+          void registration.then(() => request("ui.settingsPanel.unregister", { panelId: panel.id })).catch(() => undefined);
+        };
+      }
+    }),
     settings: Object.freeze({
       get: (key, defaultValue) => {
         validKey(key);
