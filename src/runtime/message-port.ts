@@ -25,13 +25,13 @@ export function bindRpcMessagePort(
   session: PluginRpcSession,
 ): RpcPortTransport {
   let closed = false;
-  session.setEventSink((event) => { if (!closed) port.postMessage(event); });
+  if (typeof session.setEventSink === "function") session.setEventSink((event) => { if (!closed) port.postMessage(event); });
 
   const close = (): void => {
     if (closed) return;
     closed = true;
     port.removeEventListener("message", onMessage);
-    session.close();
+    if (typeof session.close === "function") session.close();
     port.close();
   };
 
