@@ -1,5 +1,5 @@
 export const YPLUSPLUS_PRELOAD_SOURCE = `"use strict";
-const { contextBridge } = require("electron");
+const { contextBridge, ipcRenderer } = require("electron");
 const ALLOWED_HOSTS = new Set([
   "www.yapper.website",
   "yapper.website",
@@ -7,6 +7,11 @@ const ALLOWED_HOSTS = new Set([
   "yapin.gg"
 ]);
 const VERSION = "0.1.0";
+const CHANNELS = Object.freeze({
+  snapshot: "yplusplus:settings-page:snapshot",
+  get: "yplusplus:settings-page:get",
+  set: "yplusplus:settings-page:set"
+});
 
 try {
   const currentUrl = new URL(globalThis.location.href);
@@ -14,8 +19,14 @@ try {
     currentUrl.protocol === "https:" &&
     ALLOWED_HOSTS.has(currentUrl.hostname);
 
-  // Session URL matching is the first gate; these checks are defense in depth.
   if (process.isMainFrame && isAllowedOrigin) {
+    const settingsPage = Object.freeze({
+      refresh: () => ipcRenderer.invoke(CHANNELS.snapshot),
+      get: (pluginId, panelId, itemId) =>
+        ipcRenderer.invoke(CHANNELS.get, pluginId, panelId, itemId),
+      set: (pluginId, panelId, itemId, value) =>
+        ipcRenderer.invoke(CHANNELS.set, pluginId, panelId, itemId, value)
+    });
     contextBridge.exposeInMainWorld("yplusplus", {
       version: VERSION,
       runtime: "yapper-desktop",
@@ -24,11 +35,222 @@ try {
         ready: true,
         version: VERSION,
         origin: currentUrl.origin
-      })
+      }),
+      settingsPage
     });
+
+    const element = (tag, className, value) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (value !== undefined) node.textContent = String(value);
+      return node;
+    };
+    const icon = () => {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("width", "24");
+      svg.setAttribute("height", "24");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("fill", "none");
+      svg.setAttribute("stroke", "currentColor");
+      svg.setAttribute("stroke-width", "2");
+      svg.setAttribute("stroke-linecap", "round");
+      svg.setAttribute("stroke-linejoin", "round");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", "M9 6V3h6v3m-9 0h12l1 14H5L6 6Zm3 4v6m6-6v6");
+      svg.append(path);
+      return svg;
+    };
+
+    let selected = false;
+    let previousVisibility = [];
+    let currentModal = null;
+    let navButton = null;
+    let page = null;
+    let refreshToken = 0;
+
+    const showPluginPage = async () => {
+      selected = true;
+      const modal = document.querySelector('.modal[aria-label="User settings"]');
+      const nav = modal && modal.querySelector(".settings-nav");
+      const main = modal && modal.querySelector(".settings-main");
+      if (!nav || !main || !page) return;
+      previousVisibility = Array.from(main.children)
+        .filter((child) => child !== page)
+        .map((child) => [child, child.hidden]);
+      for (const [child] of previousVisibility) child.hidden = true;
+      page.hidden = false;
+      for (const button of nav.querySelectorAll("button")) {
+        button.classList.remove("active");
+        button.removeAttribute("aria-current");
+      }
+      navButton.classList.add("active");
+      navButton.setAttribute("aria-current", "page");
+      await renderSettings();
+    };
+
+    const leavePluginPage = () => {
+      if (!selected) return;
+      selected = false;
+      if (navButton) {
+        navButton.classList.remove("active");
+        navButton.removeAttribute("aria-current");
+      }
+      for (const [child, wasHidden] of previousVisibility) {
+        if (child.isConnected) child.hidden = wasHidden;
+      }
+      previousVisibility = [];
+      if (page) page.hidden = true;
+    };
+
+    const settingControl = async (pluginId, panel, item) => {
+      const field = element("div", "field");
+      const label = element("label", "", item.label);
+      const id = "yplusplus-setting-" + pluginId + "-" + panel.id + "-" + item.id;
+      label.htmlFor = id;
+      let control;
+      const value = await settingsPage.get(pluginId, panel.id, item.id);
+      if (item.type === "toggle") {
+        control = element("input", ""); control.type = "checkbox"; control.checked = Boolean(value);
+      } else if (item.type === "select") {
+        control = element("select", "input");
+        for (const option of item.options) {
+          const optionNode = element("option", "", option.label);
+          optionNode.value = option.value;
+          control.append(optionNode);
+        }
+        control.value = String(value);
+      } else {
+        control = element("input", "input");
+        control.type = item.type === "number" ? "number" : "text";
+        if (item.type === "text") {
+          if (item.placeholder) control.placeholder = item.placeholder;
+          control.maxLength = item.maxLength || 8192;
+        } else {
+          if (item.min !== undefined) control.min = String(item.min);
+          if (item.max !== undefined) control.max = String(item.max);
+          if (item.step !== undefined) control.step = String(item.step);
+        }
+        control.value = String(value);
+      }
+      control.id = id;
+      const status = element("span", "hint", item.description || "");
+      control.addEventListener("change", async () => {
+        control.disabled = true;
+        try {
+          const next = item.type === "toggle" ? control.checked :
+            item.type === "number" ? Number(control.value) : control.value;
+          await settingsPage.set(pluginId, panel.id, item.id, next);
+          status.textContent = item.description || "Saved";
+        } catch (error) {
+          status.textContent = error instanceof Error ? error.message : "Unable to save setting.";
+        } finally {
+          control.disabled = false;
+        }
+      });
+      field.append(label, control);
+      if (status.textContent) field.append(status);
+      return field;
+    };
+
+    const renderSettings = async () => {
+      if (!page || !selected) return;
+      const token = ++refreshToken;
+      page.replaceChildren();
+      const header = element("div", "ss2-page");
+      header.append(element("h2", "", "Plugins"));
+      header.append(element("p", "hint", "Installed Y++ plugins and their settings."));
+      page.append(header);
+      try {
+        const snapshot = await settingsPage.refresh();
+        if (token !== refreshToken || !selected || !page) return;
+        const pluginsById = new Map(snapshot.plugins.map((plugin) => [plugin.id, plugin]));
+        if (snapshot.plugins.length === 0) {
+          page.append(element("div", "ss2-card", "No installed plugins found."));
+        }
+        for (const plugin of snapshot.plugins) {
+          const group = element("div", "ss2-group");
+          group.append(element("div", "ss2-section", plugin.name));
+          const card = element("section", "ss2-card");
+          const runtime = plugin.runtimeState === "ACTIVE" ? "Running" : plugin.state.replaceAll("_", " ");
+          const summary = element("p", "hint", "Version " + plugin.version + " · " + runtime);
+          card.append(summary);
+          const panels = snapshot.panels.filter((entry) => entry.pluginId === plugin.id);
+          if (panels.length === 0) card.append(element("p", "hint", "This plugin has no settings panels."));
+          for (const entry of panels) {
+            const panel = entry.panel;
+            const panelTitle = element("div", "ss2-section", panel.title);
+            card.append(panelTitle);
+            if (panel.description) card.append(element("p", "hint", panel.description));
+            for (const item of panel.items) {
+              try {
+                card.append(await settingControl(plugin.id, panel, item));
+              } catch (error) {
+                card.append(element("p", "hint", "Could not load " + item.label + ": " +
+                  (error instanceof Error ? error.message : String(error))));
+              }
+              if (token !== refreshToken || !selected) return;
+            }
+          }
+          group.append(card);
+          page.append(group);
+        }
+        if (!pluginsById.size) return;
+      } catch (error) {
+        if (token === refreshToken) page.append(element("p", "hint",
+          "Y++ settings are unavailable: " + (error instanceof Error ? error.message : String(error))));
+      }
+    };
+
+    const ensureSettingsEntry = () => {
+      const modal = document.querySelector('.modal[aria-label="User settings"]');
+      const nav = modal && modal.querySelector(".settings-nav");
+      const main = modal && modal.querySelector(".settings-main");
+      if (!modal || !nav || !main) {
+        if (currentModal && !modal) leavePluginPage();
+        currentModal = null;
+        navButton = null;
+        page = null;
+        return;
+      }
+      currentModal = modal;
+      if (!navButton || !navButton.isConnected || navButton.parentElement !== nav) {
+        navButton = element("button", "yplusplus-settings-nav", "Plugins");
+        navButton.type = "button";
+        navButton.prepend(icon());
+        navButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void showPluginPage();
+        });
+        const developer = Array.from(nav.querySelectorAll("button"))
+          .find((button) => button.textContent.trim() === "Developer");
+        nav.insertBefore(navButton, developer || null);
+      }
+      if (!page || !page.isConnected || page.parentElement !== main) {
+        page = element("section", "settings-main-yplusplus");
+        page.hidden = true;
+        main.append(page);
+      }
+      if (!nav.dataset.yplusplusBound) {
+        nav.dataset.yplusplusBound = "true";
+        nav.addEventListener("click", (event) => {
+          const target = event.target;
+          const clicked = target && target.closest ? target.closest("button") : null;
+          if (clicked && clicked !== navButton) leavePluginPage();
+        }, true);
+      }
+      if (selected && page.hidden) void showPluginPage();
+    };
+
+    const observer = new MutationObserver(() => ensureSettingsEntry());
+    const start = () => {
+      if (document.documentElement) observer.observe(document.documentElement, { childList: true, subtree: true });
+      ensureSettingsEntry();
+    };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
+    else start();
   }
 } catch (error) {
-  // A failed Y++ bootstrap must never prevent Yapper's own preload from running.
   console.error("[Y++] Preload initialization failed:", error);
 }
 `;
