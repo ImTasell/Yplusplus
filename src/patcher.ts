@@ -193,6 +193,56 @@ export function patchAppDir(appDir: string): PatchResult {
   return { status: result.status, version: result.version, archivePath, backupPath };
 }
 
+export function repatchAppDir(appDir: string): PatchResult {
+  const inspected = inspectAppDir(appDir);
+  if (inspected.name !== TARGET_PACKAGE_NAME) {
+    throw new Error(`This does not look like Yapper Desktop (package name: ${inspected.name}).`);
+  }
+  if (inspected.version !== SUPPORTED_YAPPER_VERSION) {
+    throw new Error(`Unsupported Yapper version ${inspected.version}; supported version: ${SUPPORTED_YAPPER_VERSION}.`);
+  }
+  if (!inspected.patched) {
+    throw new Error("Current archive does not contain a recognized Y++ patch; refusing to replace it.");
+  }
+
+  const archivePath = inspected.archivePath;
+  const backupPath = archivePath + BACKUP_SUFFIX;
+  if (!existsSync(backupPath)) {
+    throw new Error(`No Y++ backup found at ${backupPath}.`);
+  }
+
+  const original = readFileSync(backupPath);
+  const backupArchive = parseAsar(original);
+  const backupPackage = JSON.parse(readAsarFile(backupArchive, "package.json").toString("utf8")) as {
+    name?: string;
+    version?: string;
+  };
+  const backupMain = readAsarFile(backupArchive, "main.js").toString("utf8");
+  if (backupPackage.name !== TARGET_PACKAGE_NAME || backupPackage.version !== inspected.version || backupMain.includes(PATCH_MARKER)) {
+    throw new Error("Y++ backup does not match the current Yapper version or is already patched; refusing to repatch.");
+  }
+
+  const result = patchAsarBuffer(original);
+  if (result.status !== "patched") {
+    throw new Error("Clean Y++ backup unexpectedly contains an existing patch.");
+  }
+  const current = readFileSync(archivePath);
+  if (current.equals(result.buffer)) {
+    return { status: "already-patched", version: result.version, archivePath, backupPath };
+  }
+
+  const temporaryPath = archivePath + ".yplusplus-repatch-tmp";
+  try {
+    writeFileSync(temporaryPath, result.buffer, { flag: "wx" });
+    renameSync(temporaryPath, archivePath);
+  } catch (error) {
+    if (existsSync(temporaryPath)) rmSync(temporaryPath, { force: true });
+    throw error;
+  }
+
+  return { status: "patched", version: result.version, archivePath, backupPath };
+}
+
 export function restoreAppDir(appDir: string): string {
   const inspected = inspectAppDir(appDir);
   const archivePath = inspected.archivePath;
