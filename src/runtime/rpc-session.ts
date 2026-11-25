@@ -15,6 +15,7 @@ export class PluginRpcSession {
   readonly #seenRequestIds = new Set<string>();
   #inFlight = 0;
   readonly #subscriptions = new Map<string, () => void>();
+  readonly #panelDisposers = new Map<string, () => void>();
   #eventSink: ((event: RpcSettingsChangeEvent) => void) | undefined;
   #closed = false;
   constructor(options: PluginRpcSessionOptions) {
@@ -26,7 +27,7 @@ export class PluginRpcSession {
   }
   get inFlightRequests(): number { return this.#inFlight; }
   setEventSink(sink: ((event: RpcSettingsChangeEvent) => void) | undefined): void { this.#eventSink = sink; }
-  close(): void { if (this.#closed) return; this.#closed = true; this.#eventSink = undefined; for (const dispose of this.#subscriptions.values()) dispose(); this.#subscriptions.clear(); }
+  close(): void { if (this.#closed) return; this.#closed = true; this.#eventSink = undefined; for (const dispose of this.#subscriptions.values()) dispose(); this.#subscriptions.clear(); for (const dispose of this.#panelDisposers.values()) dispose(); this.#panelDisposers.clear(); }
   async dispatch(input: unknown): Promise<RpcResponse> {
     let request;
     try { request = parseRpcRequest(input); }
@@ -40,6 +41,26 @@ export class PluginRpcSession {
     this.#seenRequestIds.add(request.requestId);
     if (this.#inFlight >= this.#maxConcurrent) return rpcFailure(request.requestId, "RATE_LIMITED", "Too many concurrent plugin requests.");
 
+    if (request.method === "ui.settingsPanel.register" || request.method === "ui.settingsPanel.unregister") {
+      const ui = this.#facade.ui;
+      if (!ui) return rpcFailure(request.requestId, "CAPABILITY_DENIED", "Plugin settings panels are not available to this plugin.");
+      try {
+        if (request.method === "ui.settingsPanel.register") {
+          const panel = request.payload.panel as Record<string, unknown>;
+          const panelId = panel.id as string;
+          if (this.#panelDisposers.has(panelId)) return rpcFailure(request.requestId, "INVALID_MESSAGE", "This plugin already registered that settings panel ID.");
+          const dispose = ui.registerSettingsPanel(panel as never);
+          this.#panelDisposers.set(panelId, dispose);
+        } else {
+          const panelId = request.payload.panelId as string;
+          this.#panelDisposers.get(panelId)?.();
+          this.#panelDisposers.delete(panelId);
+        }
+        return rpcSuccess(request.requestId);
+      } catch {
+        return rpcFailure(request.requestId, "INVALID_MESSAGE", "The settings panel definition was rejected by the host.");
+      }
+    }
     if (request.method === "settings.subscribe" || request.method === "settings.unsubscribe") {
       const settings = this.#facade.settings;
       if (!settings) return rpcFailure(request.requestId, "CAPABILITY_DENIED", "Plugin settings are not available to this plugin.");
