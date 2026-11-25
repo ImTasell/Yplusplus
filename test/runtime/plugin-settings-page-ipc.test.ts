@@ -39,9 +39,9 @@ test("native settings IPC exposes only registered plugin settings and validates 
     rejected: [],
   }) };
   const dispose = installPluginSettingsPageIpc({ ipcMain: ipc, service: service as never, registry, store });
-  const sender = { mainFrame: {}, isDestroyed: () => false };
-  const event = { sender, senderFrame: { get url() { return "https://yapper.website/settings"; } } };
-  const authorizedEvent = { sender, senderFrame: sender.mainFrame };
+  const mainFrame = { url: "https://yapper.website/settings" };
+  const sender = { mainFrame, isDestroyed: () => false };
+  const authorizedEvent = { sender, senderFrame: mainFrame };
   try {
     const snapshot = await ipc.handlers.get("yplusplus:settings-page:snapshot")!(authorizedEvent);
     assert.equal((snapshot as any).plugins[0].id, "dev.example.plugin");
