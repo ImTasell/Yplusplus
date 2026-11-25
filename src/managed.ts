@@ -15,7 +15,7 @@ import {
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BACKUP_SUFFIX, inspectAppDir, patchAppDir } from "./patcher.js";
+import { BACKUP_SUFFIX, inspectAppDir, patchAppDir, repatchAppDir } from "./patcher.js";
 
 export const YPLUSPLUS_RUNTIME_VERSION = "0.1.6";
 
@@ -211,7 +211,6 @@ export function installExtractedAppDir(
     if (existing.name !== inspected.name || existing.version !== inspected.version) {
       throw new Error(`Managed install target already exists with unexpected metadata: ${appDir}`);
     }
-    patchAppDir(appDir);
     const backupPath = existing.archivePath + BACKUP_SUFFIX;
     if (!existsSync(backupPath)) {
       throw new Error("Existing managed installation has no clean Y++ backup; refusing to adopt it.");
@@ -221,6 +220,9 @@ export function installExtractedAppDir(
     if (!previousOriginal.equals(incomingOriginal)) {
       throw new Error("A different ASAR payload uses this Yapper version number; refusing to replace or silently reuse it.");
     }
+    // Rebuild the patched archive from the verified clean backup. This updates
+    // the embedded preload when Y++ changes while preserving the original.
+    repatchAppDir(appDir);
     status = "already-installed";
   } else {
     patchAppDir(sourceAppDir);
