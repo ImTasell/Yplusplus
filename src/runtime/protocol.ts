@@ -7,7 +7,7 @@ export const RPC_MAX_MESSAGE_BYTES = 16 * 1024;
 export const RPC_MAX_DEPTH = 8;
 export const RPC_MAX_NODES = 256;
 
-export type RpcMethod = "capabilities.notifications.show" | "settings.get" | "settings.set";
+export type RpcMethod = "capabilities.notifications.show" | "settings.get" | "settings.set" | "settings.subscribe" | "settings.unsubscribe";
 export type RpcSettingValue = string | number | boolean;
 
 export interface RpcRequest {
@@ -17,6 +17,7 @@ export interface RpcRequest {
   readonly method: RpcMethod;
   readonly payload: Readonly<Record<string, unknown>>;
 }
+export interface RpcSettingsChangeEvent { readonly rpcVersion: typeof YPLUSPLUS_RPC_VERSION; readonly type: "event"; readonly event: "settings.change"; readonly payload: Readonly<{ key: string; value: RpcSettingValue }>; }
 export interface RpcSuccessResponse {
   readonly rpcVersion: typeof YPLUSPLUS_RPC_VERSION;
   readonly type: "response";
@@ -101,8 +102,10 @@ export function parseRpcRequest(input: unknown): RpcRequest {
     if (Object.keys(payload).sort().join(",") !== "message,title" || typeof payload.title !== "string" || typeof payload.message !== "string") throw new RpcProtocolError("INVALID_MESSAGE", "Notification payload must contain only string title and message fields.");
   } else if (copied.method === "settings.get") {
     if (Object.keys(payload).sort().join(",") !== "defaultValue,key" || typeof payload.key !== "string" || !settingValue(payload.defaultValue)) throw new RpcProtocolError("INVALID_MESSAGE", "Settings get payload must contain a string key and primitive defaultValue.");
-  } else if (Object.keys(payload).sort().join(",") !== "key,value" || typeof payload.key !== "string" || !settingValue(payload.value)) {
-    throw new RpcProtocolError("INVALID_MESSAGE", "Settings set payload must contain a string key and primitive value.");
+  } else if (copied.method === "settings.set") {
+    if (Object.keys(payload).sort().join(",") !== "key,value" || typeof payload.key !== "string" || !settingValue(payload.value)) throw new RpcProtocolError("INVALID_MESSAGE", "Settings set payload must contain a string key and primitive value.");
+  } else if (Object.keys(payload).sort().join(",") !== "key" || typeof payload.key !== "string") {
+    throw new RpcProtocolError("INVALID_MESSAGE", "Settings subscription payload must contain only a string key.");
   }
   return Object.freeze({
     rpcVersion: YPLUSPLUS_RPC_VERSION, type: "request", requestId: copied.requestId,
