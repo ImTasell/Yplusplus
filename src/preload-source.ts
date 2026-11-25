@@ -152,7 +152,7 @@ try {
         }
       });
       field.append(label, control);
-      if (status.textContent) field.append(status);
+      field.append(status);
       return field;
     };
 
