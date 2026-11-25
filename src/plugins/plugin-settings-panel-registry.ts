@@ -17,7 +17,10 @@ function text(value: unknown, label: string, max: number, optional = false): str
   }
   return value.trim();
 }
-function onlyKeys(value: Record<string, unknown>, allowed: readonly string[], label: string): void {\n  if (Object.keys(value).some((key) => !allowed.includes(key))) throw new TypeError(`${label} contains unsupported fields.`);\n}\nfunction identifier(value: unknown, label: string): string {
+function onlyKeys(value: Record<string, unknown>, allowed: readonly string[], label: string): void {
+  if (Object.keys(value).some((key) => !allowed.includes(key))) throw new TypeError(`${label} contains unsupported fields.`);
+}
+function identifier(value: unknown, label: string): string {
   if (typeof value !== "string" || !ID.test(value)) throw new TypeError(`Invalid ${label}.`);
   return value;
 }
