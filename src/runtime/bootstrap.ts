@@ -9,6 +9,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { PluginApprovalController } from "../plugins/approval-controller.js";
 import { PluginSettingsStore } from "../plugins/plugin-settings-store.js";
+import { PluginSettingsPanelRegistry } from "../plugins/plugin-settings-panel-registry.js";
 import { discoverPlugins } from "../plugins/discovery.js";
 import {
   createElectronPluginRuntimeHost,
@@ -65,6 +66,7 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
   const discovery = await discoverPlugins(pluginRoot);
   const approvals = new PluginApprovalController();
   const settingsStore = new PluginSettingsStore({ directory: join(root, "plugin-settings") });
+  const settingsPanelRegistry = new PluginSettingsPanelRegistry();
   const report = await approvals.inspect(discovery);
   const runtime = createElectronPluginRuntimeHost({
     BrowserWindow: dependencies.BrowserWindow,
@@ -73,6 +75,7 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     Notification: dependencies.Notification,
     getApprovedPermissions: (id, version) => approvals.store.getApprovedPermissions(id, version),
     settingsStore,
+    settingsPanelRegistry,
     isSandboxDisabled: () => isElectronSandboxDisabled(dependencies.app),
   });
 
