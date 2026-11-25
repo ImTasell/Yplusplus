@@ -159,7 +159,10 @@ settings are now wired through the host-owned RPC facade. `settings.get`,
 `settings.set`, and `settings.onChange` use the store in
 `src/plugins/plugin-settings-store.ts`; host change events are delivered over
 the plugin MessagePort, and subscriptions are disposed when the RPC session
-closes. Settings-panel RPC and trusted Yapin Settings rendering, logging, and
-application lifecycle events remain follow-on implementation batches. The
+closes. Settings-panel definitions are now validated by the host-owned registry
+and registered/unregistered over plugin RPC. Registrations are scoped to the
+authenticated plugin ID and disposed when its RPC session closes. Trusted Yapin
+Settings rendering, logging, and application lifecycle events remain follow-on
+implementation batches. The
 public `src/plugins/api.ts` contract remains the source of truth for the full
 API-1 target surface.
