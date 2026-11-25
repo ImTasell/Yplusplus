@@ -17,6 +17,7 @@ import {
   type ElectronPluginRuntimeHostOptions,
 } from "./electron-host.js";
 import { PluginManagerService } from "./plugin-manager-service.js";
+import { installPluginSettingsPageIpc } from "./plugin-settings-page-ipc.js";
 import { createPluginManagerWindow, type PluginManagerWindowOptions } from "./plugin-manager-window.js";
 
 export interface YplusplusElectronApp {
@@ -107,6 +108,12 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
   }
 
   const managerService = new PluginManagerService({ pluginRoot, approvals, runtime });
+  const disposeSettingsPageIpc = installPluginSettingsPageIpc({
+    ipcMain: dependencies.ipcMain,
+    service: managerService,
+    registry: settingsPanelRegistry,
+    store: settingsStore,
+  });
   const managerWindow = createPluginManagerWindow({
     BrowserWindow: dependencies.BrowserWindow,
     ipcMain: dependencies.ipcMain,
@@ -134,6 +141,7 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
         }
       })
       .finally(() => {
+        disposeSettingsPageIpc();
         allowQuit = true;
         dependencies.app.quit();
       });
