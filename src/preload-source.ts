@@ -234,7 +234,7 @@ try {
         nav.insertBefore(navButton, developer || null);
       }
       if (!page || !page.isConnected || page.parentElement !== main) {
-        page = element("section", "ss2-page yplusplus-settings-page");
+        page = element("section", "yplusplus-settings-page");
         page.hidden = true;
         main.append(page);
       }
