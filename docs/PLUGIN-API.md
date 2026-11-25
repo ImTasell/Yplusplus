@@ -23,9 +23,11 @@ A plugin ships a self-contained ESM entry module. The host loads it only after
 manifest validation, exact-release execution trust, compatibility checks, and
 approval of every requested capability.
 
-```ts
-import type { YPlusPlusAPI } from "@yplusplus/plugin-api";
+The canonical TypeScript contract is `YPlusPlusAPI` in
+`src/plugins/api.ts`. The plugin SDK/package distribution is a separate
+packaging task; this repository path is the source of truth for API-1 types.
 
+```ts
 export async function activate(api: YPlusPlusAPI) {
   api.logger.info("Plugin activated");
 
@@ -45,8 +47,6 @@ must be idempotent and is run during unload. Plugins must not assume that
 cleanup runs after a process crash or forced termination.
 
 ## API surface
-
-The canonical TypeScript contract is `src/plugins/api.ts`.
 
 | Namespace | Contract |
 |---|---|
