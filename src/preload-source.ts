@@ -39,6 +39,7 @@ try {
       settingsPage
     });
 
+    if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
     const element = (tag, className, value) => {
       const node = document.createElement(tag);
       if (className) node.className = className;
@@ -255,6 +256,7 @@ try {
     };
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
     else start();
+    }
   }
 } catch (error) {
   console.error("[Y++] Preload initialization failed:", error);
