@@ -155,3 +155,28 @@ test("client receives host settings changes and unsubscribes on disposer", async
   client.close();
   host.close();
 });
+
+
+test("client registers declarative settings panels and returns an unregister disposer", async () => {
+  const channel = new MessageChannel();
+  const host = port(channel.port1);
+  const client = createPluginApiClient(port(channel.port2));
+  const seen: Array<{ method: string; payload: unknown }> = [];
+  host.addEventListener("message", (event) => {
+    const request = event.data as { requestId: string; method: string; payload: unknown };
+    seen.push({ method: request.method, payload: request.payload });
+    host.postMessage({ rpcVersion: 1, type: "response", requestId: request.requestId, ok: true, result: null });
+  });
+  host.start();
+  const panel = { id: "general", title: "General", items: [{ type: "toggle" as const, id: "enabled", label: "Enabled", defaultValue: true }] };
+  const dispose = client.ui.registerSettingsPanel(panel);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  dispose();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(seen, [
+    { method: "ui.settingsPanel.register", payload: { panel } },
+    { method: "ui.settingsPanel.unregister", payload: { panelId: "general" } },
+  ]);
+  client.close();
+  host.close();
+});
