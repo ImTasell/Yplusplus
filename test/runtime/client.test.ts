@@ -99,3 +99,28 @@ test("times out unanswered calls and validates client limits", async () => {
   unused.port1.close();
   unused.port2.close();
 });
+
+
+test("client exposes settings get and set through RPC", async () => {
+  const channel = new MessageChannel();
+  const host = port(channel.port1);
+  const client = createPluginApiClient(port(channel.port2));
+  const seen: Array<{ method: string; payload: unknown }> = [];
+  host.addEventListener("message", (event) => {
+    const request = event.data as { requestId: string; method: string; payload: unknown };
+    seen.push({ method: request.method, payload: request.payload });
+    host.postMessage({
+      rpcVersion: 1, type: "response", requestId: request.requestId,
+      ok: true, result: request.method === "settings.get" ? "compact" : null,
+    });
+  });
+  host.start();
+  assert.equal(await client.settings.get("layout", "default"), "compact");
+  await client.settings.set("layout", "compact");
+  assert.deepEqual(seen, [
+    { method: "settings.get", payload: { key: "layout", defaultValue: "default" } },
+    { method: "settings.set", payload: { key: "layout", value: "compact" } },
+  ]);
+  client.close();
+  host.close();
+});
