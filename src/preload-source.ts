@@ -138,7 +138,9 @@ try {
           document.documentElement.style.setProperty("--yplusplus-font-family", "\"" + font.family + "\", sans-serif", "important");
         }
       } catch (error) {
-        console.error("[Y++] Could not apply selected font:", error);
+        // The main-process settings handlers may still be starting when the
+        // app's first renderer document loads. Startup retries below cover it.
+        console.debug("[Y++] Custom font is not ready yet:", error);
       }
     };
 
@@ -595,6 +597,9 @@ try {
       if (document.documentElement) observer.observe(document.documentElement, { childList: true, subtree: true });
       ensureSettingsEntry();
       void applyActiveFont();
+      for (const delay of [500, 1500, 3500, 7000]) {
+        setTimeout(() => { void applyActiveFont(); }, delay);
+      }
     };
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
     else start();
