@@ -131,7 +131,8 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     ? resolve(configuredPluginRoot)
     : join(root, "plugins");
   await mkdir(pluginRoot, { recursive: true, mode: 0o700 });
-  const builtinFonts = await seedBuiltinFontsPlugin(pluginRoot);\n  const builtinHello = await seedBuiltinHelloPlugin(pluginRoot);
+  const builtinFonts = await seedBuiltinFontsPlugin(pluginRoot);
+  const builtinHello = await seedBuiltinHelloPlugin(pluginRoot);
 
   const discovery = await discoverPlugins(pluginRoot);
   const approvals = new PluginApprovalController();
