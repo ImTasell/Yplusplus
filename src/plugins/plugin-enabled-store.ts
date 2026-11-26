@@ -1,8 +1,8 @@
 /**
- * Persistent per-release enable/disable preferences.
+ * Persistent plugin enable/disable preferences.
  *
- * This preference controls lifecycle startup only. It never grants execution
- * trust or capabilities; those remain separate host-owned decisions.
+ * Enabled state follows the stable plugin ID across releases. It controls
+ * lifecycle startup only and never grants execution trust or capabilities.
  */
 import { randomBytes } from "node:crypto";
 import { chmod, lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -10,20 +10,14 @@ import { dirname, join, resolve } from "node:path";
 
 const VERSION = 1 as const;
 const ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
-const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 
-interface DisabledRelease {
-  readonly pluginId: string;
-  readonly pluginVersion: string;
-}
 interface EnableDocument {
   readonly storeVersion: typeof VERSION;
-  readonly disabled: readonly DisabledRelease[];
+  readonly disabled: readonly string[];
 }
 
-function validate(pluginId: string, pluginVersion: string): void {
+function validate(pluginId: string): void {
   if (typeof pluginId !== "string" || !ID.test(pluginId)) throw new TypeError("Invalid plugin ID.");
-  if (typeof pluginVersion !== "string" || !SEMVER.test(pluginVersion)) throw new TypeError("Invalid plugin version; expected SemVer.");
 }
 
 function parse(input: unknown): EnableDocument {
@@ -34,19 +28,12 @@ function parse(input: unknown): EnableDocument {
     throw new Error("Invalid plugin enable document.");
   }
   const seen = new Set<string>();
-  const disabled: DisabledRelease[] = [];
+  const disabled: string[] = [];
   for (const item of value.disabled) {
-    if (typeof item !== "object" || item === null || Array.isArray(item)) throw new Error("Invalid disabled plugin record.");
-    const record = item as Record<string, unknown>;
-    if (Object.keys(record).sort().join(",") !== "pluginId,pluginVersion" ||
-        typeof record.pluginId !== "string" || typeof record.pluginVersion !== "string") {
-      throw new Error("Invalid disabled plugin record.");
-    }
-    validate(record.pluginId, record.pluginVersion);
-    const key = record.pluginId + "@" + record.pluginVersion;
-    if (seen.has(key)) throw new Error("Duplicate disabled plugin record.");
-    seen.add(key);
-    disabled.push(Object.freeze({ pluginId: record.pluginId, pluginVersion: record.pluginVersion }));
+    if (typeof item !== "string" || !ID.test(item)) throw new Error("Invalid disabled plugin record.");
+    if (seen.has(item)) throw new Error("Duplicate disabled plugin record.");
+    seen.add(item);
+    disabled.push(item);
   }
   return Object.freeze({ storeVersion: VERSION, disabled: Object.freeze(disabled) });
 }
@@ -82,22 +69,21 @@ export class PluginEnabledStore {
     }
   }
 
-  async isEnabled(pluginId: string, pluginVersion: string): Promise<boolean> {
-    validate(pluginId, pluginVersion);
+  async isEnabled(pluginId: string): Promise<boolean> {
+    validate(pluginId);
     await this.#queue;
     const document = await this.#read();
-    return !document.disabled.some((item) => item.pluginId === pluginId && item.pluginVersion === pluginVersion);
+    return !document.disabled.includes(pluginId);
   }
 
-  async setEnabled(pluginId: string, pluginVersion: string, enabled: boolean): Promise<void> {
-    validate(pluginId, pluginVersion);
+  async setEnabled(pluginId: string, enabled: boolean): Promise<void> {
+    validate(pluginId);
     if (typeof enabled !== "boolean") throw new TypeError("Plugin enabled state must be boolean.");
     const operation = this.#queue.then(async () => {
       const current = await this.#read();
-      const disabled = current.disabled.filter((item) =>
-        item.pluginId !== pluginId || item.pluginVersion !== pluginVersion);
-      if (!enabled) disabled.push({ pluginId, pluginVersion });
-      disabled.sort((a, b) => a.pluginId.localeCompare(b.pluginId) || a.pluginVersion.localeCompare(b.pluginVersion));
+      const disabled = current.disabled.filter((item) => item !== pluginId);
+      if (!enabled) disabled.push(pluginId);
+      disabled.sort((a, b) => a.localeCompare(b));
 
       const directory = dirname(this.filePath);
       await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -106,7 +92,7 @@ export class PluginEnabledStore {
         throw new Error("Plugin enable-state directory must be a non-symlink directory.");
       }
       await chmod(directory, 0o700);
-      const temporary = join(directory, `.plugin-enabled-${randomBytes(8).toString("hex")}.tmp`);
+      const temporary = join(directory, ".plugin-enabled-" + randomBytes(8).toString("hex") + ".tmp");
       try {
         await writeFile(temporary, JSON.stringify({ storeVersion: VERSION, disabled }, null, 2) + "\n", {
           encoding: "utf8", flag: "wx", mode: 0o600,
