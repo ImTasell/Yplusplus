@@ -10,7 +10,12 @@ const VERSION = "0.1.0";
 const CHANNELS = Object.freeze({
   snapshot: "yplusplus:settings-page:snapshot",
   get: "yplusplus:settings-page:get",
-  set: "yplusplus:settings-page:set"
+  set: "yplusplus:settings-page:set",
+  enabled: "yplusplus:settings-page:enabled",
+  fontImport: "yplusplus:settings-page:font-import",
+  fontRemove: "yplusplus:settings-page:font-remove",
+  fontSelect: "yplusplus:settings-page:font-select",
+  fontActive: "yplusplus:settings-page:font-active"
 });
 
 try {
@@ -24,8 +29,27 @@ try {
       refresh: () => ipcRenderer.invoke(CHANNELS.snapshot),
       get: (pluginId, panelId, itemId) =>
         ipcRenderer.invoke(CHANNELS.get, pluginId, panelId, itemId),
-      set: (pluginId, panelId, itemId, value) =>
-        ipcRenderer.invoke(CHANNELS.set, pluginId, panelId, itemId, value)
+      set: async (pluginId, panelId, itemId, value) => {
+        const result = await ipcRenderer.invoke(CHANNELS.set, pluginId, panelId, itemId, value);
+        await applyActiveFont();
+        return result;
+      },
+      setEnabled: async (pluginId, version, enabled) => {
+        const result = await ipcRenderer.invoke(CHANNELS.enabled, pluginId, version, enabled);
+        await applyActiveFont();
+        return result;
+      },
+      importFont: (fileName, bytes) => ipcRenderer.invoke(CHANNELS.fontImport, fileName, bytes),
+      removeFont: async (fontId) => {
+        const result = await ipcRenderer.invoke(CHANNELS.fontRemove, fontId);
+        await applyActiveFont();
+        return result;
+      },
+      setActiveFont: async (fontId) => {
+        const result = await ipcRenderer.invoke(CHANNELS.fontSelect, fontId);
+        await applyActiveFont();
+        return result;
+      }
     });
     contextBridge.exposeInMainWorld("yplusplus", {
       version: VERSION,
@@ -69,6 +93,48 @@ try {
     let navButton = null;
     let page = null;
     let refreshToken = 0;
+    let appliedFontFace = null;
+    let fontStyleSheet = null;
+    let fontApplyToken = 0;
+
+    const clearActiveFont = () => {
+      if (appliedFontFace && document.fonts) document.fonts.delete(appliedFontFace);
+      appliedFontFace = null;
+      if (fontStyleSheet && document.adoptedStyleSheets) {
+        document.adoptedStyleSheets = document.adoptedStyleSheets.filter((sheet) => sheet !== fontStyleSheet);
+      }
+      fontStyleSheet = null;
+      if (document.documentElement) document.documentElement.style.removeProperty("--yplusplus-font-family");
+    };
+
+    async function applyActiveFont() {
+      const token = ++fontApplyToken;
+      try {
+        const font = await ipcRenderer.invoke(CHANNELS.fontActive);
+        if (token !== fontApplyToken) return;
+        if (!font || typeof FontFace === "undefined" || !document.fonts) {
+          clearActiveFont();
+          return;
+        }
+        const face = new FontFace(font.family, new Uint8Array(font.bytes).buffer);
+        await face.load();
+        if (token !== fontApplyToken) return;
+        clearActiveFont();
+        document.fonts.add(face);
+        appliedFontFace = face;
+        if (typeof CSSStyleSheet !== "undefined" && document.adoptedStyleSheets) {
+          const sheet = new CSSStyleSheet();
+          sheet.replaceSync("body, body *, button, input, textarea, select, [role=button] { font-family: \"" +
+            font.family + "\", sans-serif !important; }");
+          document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+          fontStyleSheet = sheet;
+        } else if (document.documentElement) {
+          document.documentElement.style.setProperty("--yplusplus-font-family", "\"" + font.family + "\", sans-serif", "important");
+        }
+      } catch (error) {
+        console.error("[Y++] Could not apply selected font:", error);
+      }
+    }
 
     const showPluginPage = async () => {
       if (selected && page && page.isConnected && !page.hidden) {
@@ -257,6 +323,7 @@ try {
     const start = () => {
       if (document.documentElement) observer.observe(document.documentElement, { childList: true, subtree: true });
       ensureSettingsEntry();
+      void applyActiveFont();
     };
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
     else start();
