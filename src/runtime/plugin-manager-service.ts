@@ -109,7 +109,7 @@ export class PluginManagerService {
     const [pluginId, pluginVersion] = validateIdentity(id, version);
     if (typeof enabled !== "boolean") throw new TypeError("Plugin enabled state must be boolean.");
     if (!this.#options.enabledStore) throw new Error("Persistent plugin enable state is unavailable.");
-    const plugin = await this.#find(pluginId, pluginVersion);
+    await this.#find(pluginId, pluginVersion);
     await this.#options.enabledStore.setEnabled(pluginId, pluginVersion, enabled);
     if (enabled) {
       const report = await this.#options.approvals.inspect(await this.#discover());
@@ -176,6 +176,9 @@ export class PluginManagerService {
     if (!plugin) throw new Error(`No discovered plugin matches ${pluginId}@${pluginVersion}.`);
     if (plugin.state !== "READY" || plugin.trusted !== true) {
       throw new Error("Only trusted, fully approved plugins can be started.");
+    }
+    if (this.#options.enabledStore && !(await this.#options.enabledStore.isEnabled(pluginId, pluginVersion))) {
+      throw new Error("This plugin is disabled. Enable it from the Plugins page first.");
     }
     await this.#startIfReady(plugin);
     return this.refresh();
