@@ -17,7 +17,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BACKUP_SUFFIX, inspectAppDir, patchAppDir, repatchAppDir } from "./patcher.js";
 
-export const YPLUSPLUS_RUNTIME_VERSION = "0.1.9";
+export const YPLUSPLUS_RUNTIME_VERSION = "0.1.10";
 
 const RUNTIME_FILES = [
   "cli.js",
