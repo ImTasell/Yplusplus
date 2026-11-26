@@ -28,7 +28,7 @@ test("plugin enable store rejects malformed identities and invalid values", asyn
   try {
     await assert.rejects(store.isEnabled("../escape", "1.0.0"), /plugin ID/);
     await assert.rejects(store.setEnabled("dev.example.plugin", "latest", false), /SemVer/);
-    await assert.rejects(store.setEnabled("dev.example.plugin", "1.0.0", "false"), /boolean/);
+    await assert.rejects((store.setEnabled as (id: string, version: string, value: unknown) => Promise<void>)("dev.example.plugin", "1.0.0", "false"), /boolean/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
