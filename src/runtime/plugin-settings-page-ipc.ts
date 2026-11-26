@@ -194,9 +194,6 @@ export function installPluginSettingsPageIpc(options: PluginSettingsPageIpcOptio
     }],
     [CHANNELS[11], async (event) => {
       if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ audio request.");
-      const snapshot = await options.service.refresh();
-      const hello = snapshot.plugins.find((plugin) => plugin.id === "dev.yplusplus.hello");
-      if (!hello || !hello.trusted || !hello.enabled) return null;
       return options.audio.getActive();
     }],
   ];
