@@ -94,6 +94,8 @@ try {
     let selected = false;
     let previousMain = null;
     let previousMainHidden = false;
+    let previousMainDisplay = "";
+    let previousMainDisplayPriority = "";
     let currentModal = null;
     let navButton = null;
     let page = null;
@@ -143,6 +145,35 @@ try {
       }
     };
 
+    const hideNativeMain = (main) => {
+      if (!main) return;
+      if (previousMain !== main) {
+        restoreNativeMain();
+        previousMain = main;
+        previousMainHidden = main.hidden;
+        previousMainDisplay = main.style.getPropertyValue("display");
+        previousMainDisplayPriority = main.style.getPropertyPriority("display");
+      }
+      main.hidden = true;
+      main.style.setProperty("display", "none", "important");
+    };
+
+    const restoreNativeMain = () => {
+      if (!previousMain || !previousMain.isConnected) {
+        previousMain = null;
+        return;
+      }
+      previousMain.hidden = previousMainHidden;
+      if (previousMainDisplay) {
+        previousMain.style.setProperty("display", previousMainDisplay, previousMainDisplayPriority);
+      } else {
+        previousMain.style.removeProperty("display");
+      }
+      previousMain = null;
+      previousMainDisplay = "";
+      previousMainDisplayPriority = "";
+    };
+
     const showPluginPage = async () => {
       if (selected && page && page.isConnected && !page.hidden) {
         await renderSettings();
@@ -153,13 +184,12 @@ try {
       const nav = modal && modal.querySelector(".settings-nav");
       const main = modal && modal.querySelector(".settings-main");
       if (!nav || !main || !page) return;
-      if (!wasSelected || previousMain !== main) {
-        previousMain = main;
-        previousMainHidden = main.hidden;
-      }
+      if (!wasSelected || previousMain !== main) hideNativeMain(main);
       selected = true;
       main.hidden = true;
+      main.style.setProperty("display", "none", "important");
       page.hidden = false;
+      page.style.setProperty("display", "block", "important");
       for (const button of nav.querySelectorAll("button")) {
         button.classList.remove("active");
         button.removeAttribute("aria-current");
@@ -177,9 +207,11 @@ try {
         navButton.classList.remove("active");
         navButton.removeAttribute("aria-current");
       }
-      if (previousMain && previousMain.isConnected) previousMain.hidden = previousMainHidden;
-      previousMain = null;
-      if (page) page.hidden = true;
+      restoreNativeMain();
+      if (page) {
+        page.hidden = true;
+        page.style.setProperty("display", "none", "important");
+      }
       closeSettingsPopup();
     };
 
@@ -568,6 +600,7 @@ try {
       if (!page || !page.isConnected || page.parentElement !== shell) {
         page = element("section", "yplusplus-settings-content");
         page.hidden = true;
+        page.style.setProperty("display", "none", "important");
         page.style.flex = "1 1 0";
         page.style.minWidth = "0";
         page.style.overflowY = "auto";
@@ -583,10 +616,12 @@ try {
           if (clicked && clicked !== navButton) leavePluginPage();
         }, true);
       }
-      if (selected && previousMain !== main) {
-        previousMain = main;
-        previousMainHidden = main.hidden;
+      if (selected && previousMain !== main) hideNativeMain(main);
+      if (selected) {
         main.hidden = true;
+        main.style.setProperty("display", "none", "important");
+        page.hidden = false;
+        page.style.setProperty("display", "block", "important");
       }
       if (selected && page.hidden) void showPluginPage();
     };
