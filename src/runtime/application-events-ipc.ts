@@ -38,6 +38,7 @@ export function installApplicationEventsIpc(options: ApplicationEventsIpcOptions
   dispose(): void;
 }> {
   const readySenders = new Set<ApplicationWebContents>();
+  let startupAudioDispatched = false;
   const signalled = new WeakSet<ApplicationWebContents>();
   const onReady = (event: ApplicationIpcEvent): void => {
     if (!isAllowedMainFrame(event) || signalled.has(event.sender)) return;
@@ -49,15 +50,21 @@ export function installApplicationEventsIpc(options: ApplicationEventsIpcOptions
   return Object.freeze({
     async playStartupAudio(plugin) {
       if (plugin.id !== "dev.yplusplus.hello") throw new Error("Only the Hello! plugin can request startup audio.");
+      if (startupAudioDispatched) return;
       const active = await options.audio.getActive();
       if (!active) return;
+      startupAudioDispatched = true;
       for (const sender of [...readySenders]) {
         if (sender.isDestroyed()) { readySenders.delete(sender); continue; }
         if (typeof sender.send !== "function") continue;
-        sender.send(PLAY_CHANNEL, Object.freeze({
-          bytes: active.bytes,
-          mimeType: active.mimeType,
-        }));
+        try {
+          sender.send(PLAY_CHANNEL, Object.freeze({
+            bytes: active.bytes,
+            mimeType: active.mimeType,
+          }));
+        } catch {
+          readySenders.delete(sender);
+        }
       }
     },
     dispose() {
