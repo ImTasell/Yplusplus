@@ -54,6 +54,7 @@ class TestPort implements RpcMessagePort {
 
 function setup(start: (pluginPort: RpcMessagePort, signal?: AbortSignal) => Promise<PluginExecutionHandle>, timeout = 500) {
   const channels: Array<[TestPort, TestPort]> = [];
+  const sessions: Array<{ events: number[] }> = [];
   const runtime = new PluginRuntimeHost({
     createChannel: () => {
       const hostPort = new TestPort();
@@ -61,11 +62,18 @@ function setup(start: (pluginPort: RpcMessagePort, signal?: AbortSignal) => Prom
       channels.push([hostPort, pluginPort]);
       return { hostPort, pluginPort };
     },
-    createSession: () => ({ dispatch: async () => ({}) } as unknown as PluginRpcSession),
+    createSession: () => {
+      const record = { events: [] as number[] };
+      sessions.push(record);
+      return {
+        dispatch: async () => ({}),
+        emitApplicationReady: (timestamp: number) => record.events.push(timestamp),
+      } as unknown as PluginRpcSession;
+    },
     execution: { start: (_plugin, pluginPort, signal) => start(pluginPort, signal) },
     startupTimeoutMs: timeout,
   });
-  return { runtime, channels };
+  return { runtime, channels, sessions };
 }
 
 test("starts only READY plugins and transitions them to ACTIVE", async () => {
@@ -196,4 +204,15 @@ test("aborts the execution adapter when runtime startup times out", async () => 
   assert.equal(receivedSignal?.aborted, true);
   assert.equal(channels[0]?.[0].closed, true);
   assert.equal(channels[0]?.[1].closed, true);
+});
+
+
+test("delivers an early application-ready signal when a plugin finishes starting", async () => {
+  const worker = handle();
+  const { runtime, sessions } = setup(async () => worker.value);
+  runtime.emitApplicationReady(1234);
+  await runtime.start(plugin());
+  assert.deepEqual(sessions[0]?.events, [1234]);
+  runtime.emitApplicationReady(5678);
+  assert.deepEqual(sessions[0]?.events, [1234], "application readiness is delivered once");
 });
