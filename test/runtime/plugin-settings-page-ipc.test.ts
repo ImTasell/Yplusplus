@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { PluginSettingsStore } from "../../src/plugins/plugin-settings-store.js";
 import { FontStore } from "../../src/plugins/font-store.js";
+import { AudioStore } from "../../src/plugins/audio-store.js";
 import { PluginSettingsPanelRegistry } from "../../src/plugins/plugin-settings-panel-registry.js";
 import { installPluginSettingsPageIpc } from "../../src/runtime/plugin-settings-page-ipc.js";
 
@@ -34,6 +35,7 @@ test("native settings IPC exposes only registered plugin settings and validates 
   const ipc = new FakeIpcMain();
   const store = new PluginSettingsStore({ directory });
   const fonts = new FontStore({ directory: join(directory, "fonts") });
+  const audio = new AudioStore({ directory: join(directory, "audio") });
   const registry = new PluginSettingsPanelRegistry();
   registry.register("dev.example.plugin", definition);
   const service = {
@@ -45,7 +47,7 @@ test("native settings IPC exposes only registered plugin settings and validates 
       plugins: [], rejected: [],
     }),
   };
-  const dispose = installPluginSettingsPageIpc({ ipcMain: ipc, service: service as never, registry, store, fonts });
+  const dispose = installPluginSettingsPageIpc({ ipcMain: ipc, service: service as never, registry, store, fonts, audio });
   const mainFrame = { url: "https://yapper.website/settings" };
   const sender = { mainFrame, isDestroyed: () => false };
   const authorizedEvent = { sender, senderFrame: mainFrame };
@@ -54,6 +56,7 @@ test("native settings IPC exposes only registered plugin settings and validates 
     assert.equal((snapshot as any).plugins[0].id, "dev.example.plugin");
     assert.equal((snapshot as any).plugins[0].enabled, true);
     assert.deepEqual((snapshot as any).fonts, []);
+    assert.deepEqual((snapshot as any).audio, []);
     assert.equal((snapshot as any).panels[0].panel.id, "general");
 
     const get = ipc.handlers.get("yplusplus:settings-page:get")!;
@@ -90,7 +93,7 @@ test("native settings IPC exposes only registered plugin settings and validates 
   } finally {
     dispose();
     assert.equal(ipc.handlers.size, 0);
-    assert.equal(ipc.removed.length, 8);
+    assert.equal(ipc.removed.length, 12);
     await rm(directory, { recursive: true, force: true });
   }
 });
