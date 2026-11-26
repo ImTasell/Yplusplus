@@ -6,15 +6,18 @@ import type { PluginSettingsStore, PluginSettingValue } from "../plugins/plugin-
 import type { PluginSettingsPanelRegistry } from "../plugins/plugin-settings-panel-registry.js";
 import type { SettingsPanelDefinition } from "../plugins/api.js";
 export interface NotificationRequest { readonly title: string; readonly message: string; }
-export type NotificationAdapter = (plugin: Readonly<{ id: string; version: string }>, request: NotificationRequest) => void | Promise<void>;\nexport type StartupAudioAdapter = (plugin: Readonly<{ id: string; version: string }>) => void | Promise<void>;
+export type NotificationAdapter = (plugin: Readonly<{ id: string; version: string }>, request: NotificationRequest) => void | Promise<void>;
+export type StartupAudioAdapter = (plugin: Readonly<{ id: string; version: string }>) => void | Promise<void>;
 export interface CapabilityBrokerOptions {
   readonly getApprovedPermissions: PluginApprovalProvider;
-  readonly notifications: NotificationAdapter;\n  readonly startupAudio?: StartupAudioAdapter;
+  readonly notifications: NotificationAdapter;
+  readonly startupAudio?: StartupAudioAdapter;
   readonly settingsStore?: PluginSettingsStore;
   readonly settingsPanelRegistry?: PluginSettingsPanelRegistry;
 }
 export interface PluginCapabilityFacade {
-  readonly notifications?: Readonly<{ show(request: NotificationRequest): Promise<void> }>;\n  readonly audio?: Readonly<{ playStartup(): Promise<void> }>;
+  readonly notifications?: Readonly<{ show(request: NotificationRequest): Promise<void> }>;
+  readonly audio?: Readonly<{ playStartup(): Promise<void> }>;
   readonly ui?: Readonly<{ registerSettingsPanel(panel: SettingsPanelDefinition): () => void }>;
   readonly settings?: Readonly<{
     get(key: string, defaultValue: PluginSettingValue): Promise<PluginSettingValue>;
@@ -54,7 +57,12 @@ export async function createPluginCapabilityFacade(plugin: ManagedPlugin, option
       await options.notifications(Object.freeze({ id: plugin.id, version: plugin.version }), normalizeNotification(input));
     } });
   }
-  if (plugin.id === "dev.yplusplus.hello" && options.startupAudio) {\n    facade.audio = Object.freeze({ playStartup: async () => {\n      await options.startupAudio!(Object.freeze({ id: plugin.id, version: plugin.version }));\n    } });\n  }\n  if (options.settingsPanelRegistry) {
+  if (plugin.id === "dev.yplusplus.hello" && options.startupAudio) {
+    facade.audio = Object.freeze({ playStartup: async () => {
+      await options.startupAudio!(Object.freeze({ id: plugin.id, version: plugin.version }));
+    } });
+  }
+  if (options.settingsPanelRegistry) {
     const pluginId = plugin.id;
     facade.ui = Object.freeze({ registerSettingsPanel: (panel: SettingsPanelDefinition) => options.settingsPanelRegistry!.register(pluginId, panel) });
   }
