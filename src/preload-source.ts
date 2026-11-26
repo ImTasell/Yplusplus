@@ -522,11 +522,20 @@ try {
       const nav = modal && modal.querySelector(".settings-nav");
       const main = modal && modal.querySelector(".settings-main");
       const shell = main && main.parentElement;
-      if (!modal || !nav || !main || !shell) {
-        if (currentModal && !modal) { leavePluginPage(); closeSettingsPopup(); }
+      if (!modal) {
+        if (currentModal || selected || activePopup) {
+          leavePluginPage();
+          closeSettingsPopup();
+        }
         currentModal = null;
         navButton = null;
         page = null;
+        return;
+      }
+      if (!nav || !main || !shell) {
+        // Yapper can briefly remove/rebuild these nodes during Settings
+        // transitions. Keep our selection snapshot until the shell returns.
+        currentModal = modal;
         return;
       }
       currentModal = modal;
