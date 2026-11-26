@@ -130,7 +130,7 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
   const started: string[] = [];
   const failed: string[] = [];
   for (const plugin of report.plugins) {
-    if (plugin.state !== "READY" || !(await enabledStore.isEnabled(plugin.id, plugin.version))) continue;
+    if (plugin.state !== "READY" || !(await enabledStore.isEnabled(plugin.id))) continue;
     try {
       await runtime.start(plugin);
       started.push(plugin.id);
