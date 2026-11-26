@@ -17,7 +17,9 @@ export interface RpcRequest {
   readonly method: RpcMethod;
   readonly payload: Readonly<Record<string, unknown>>;
 }
-export interface RpcSettingsChangeEvent { readonly rpcVersion: typeof YPLUSPLUS_RPC_VERSION; readonly type: "event"; readonly event: "settings.change"; readonly payload: Readonly<{ key: string; value: RpcSettingValue }>; }\nexport interface RpcApplicationReadyEvent { readonly rpcVersion: typeof YPLUSPLUS_RPC_VERSION; readonly type: "event"; readonly event: "application.ready"; readonly payload: Readonly<{ timestamp: number }>; }\nexport type RpcPluginEvent = RpcSettingsChangeEvent | RpcApplicationReadyEvent;
+export interface RpcSettingsChangeEvent { readonly rpcVersion: typeof YPLUSPLUS_RPC_VERSION; readonly type: "event"; readonly event: "settings.change"; readonly payload: Readonly<{ key: string; value: RpcSettingValue }>; }
+export interface RpcApplicationReadyEvent { readonly rpcVersion: typeof YPLUSPLUS_RPC_VERSION; readonly type: "event"; readonly event: "application.ready"; readonly payload: Readonly<{ timestamp: number }>; }
+export type RpcPluginEvent = RpcSettingsChangeEvent | RpcApplicationReadyEvent;
 export interface RpcSuccessResponse {
   readonly rpcVersion: typeof YPLUSPLUS_RPC_VERSION;
   readonly type: "response";
@@ -108,7 +110,9 @@ export function parseRpcRequest(input: unknown): RpcRequest {
     if (Object.keys(payload).sort().join(",") !== "key" || typeof payload.key !== "string") {
       throw new RpcProtocolError("INVALID_MESSAGE", "Settings subscription payload must contain only a string key.");
     }
-  } else if (copied.method === "audio.playStartup") {\n    if (Object.keys(payload).length !== 0) throw new RpcProtocolError("INVALID_MESSAGE", "Audio playback takes no arguments.");\n  } else if (copied.method === "ui.settingsPanel.register") {
+  } else if (copied.method === "audio.playStartup") {
+    if (Object.keys(payload).length !== 0) throw new RpcProtocolError("INVALID_MESSAGE", "Audio playback takes no arguments.");
+  } else if (copied.method === "ui.settingsPanel.register") {
     if (Object.keys(payload).sort().join(",") !== "panel" || !record(payload.panel)) {
       throw new RpcProtocolError("INVALID_MESSAGE", "Settings panel registration requires a panel object.");
     }
