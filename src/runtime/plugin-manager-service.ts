@@ -2,11 +2,13 @@ import { PluginApprovalController } from "../plugins/approval-controller.js";
 import { discoverPlugins } from "../plugins/discovery.js";
 import type { ManagedPlugin } from "../plugins/manager.js";
 import type { PluginRuntimeHost } from "./host.js";
+import type { PluginEnabledStore } from "../plugins/plugin-enabled-store.js";
 
 export interface PluginManagerServiceOptions {
   readonly pluginRoot: string;
   readonly approvals: PluginApprovalController;
   readonly runtime: PluginRuntimeHost;
+  readonly enabledStore?: PluginEnabledStore;
 }
 
 export interface PluginManagerPluginView {
@@ -15,6 +17,7 @@ export interface PluginManagerPluginView {
   readonly version: string;
   readonly state: string;
   readonly trusted: boolean;
+  readonly enabled: boolean;
   readonly requestedPermissions: readonly string[];
   readonly approvedPermissions: readonly string[];
   readonly deniedPermissions: ManagedPlugin["deniedPermissions"];
@@ -60,6 +63,7 @@ export class PluginManagerService {
 
   async #startIfReady(plugin: ManagedPlugin): Promise<void> {
     if (plugin.state !== "READY" || plugin.trusted !== true) return;
+    if (this.#options.enabledStore && !(await this.#options.enabledStore.isEnabled(plugin.id, plugin.version))) return;
     const current = this.#options.runtime.get(plugin.id);
     if (current && current.state !== "UNLOADED" && current.state !== "FAILED") return;
     await this.#options.runtime.start(plugin);
@@ -69,14 +73,18 @@ export class PluginManagerService {
     const discovery = await this.#discover();
     const report = await this.#options.approvals.inspect(discovery);
     const runtime = new Map(this.#options.runtime.list().map((item) => [item.id, item]));
-    const plugins = report.plugins.map((plugin) => {
+    const plugins = await Promise.all(report.plugins.map(async (plugin) => {
       const runtimeState = runtime.get(plugin.id)?.state;
+      const enabled = this.#options.enabledStore
+        ? await this.#options.enabledStore.isEnabled(plugin.id, plugin.version)
+        : true;
       return Object.freeze({
         id: plugin.id,
         name: plugin.name,
         version: plugin.version,
         state: plugin.state,
         trusted: plugin.trusted === true,
+        enabled,
         requestedPermissions: plugin.requestedPermissions,
         approvedPermissions: plugin.approvedPermissions,
         deniedPermissions: plugin.deniedPermissions,
@@ -84,7 +92,7 @@ export class PluginManagerService {
         ...(plugin.issue ? { issue: plugin.issue } : {}),
         ...(runtimeState ? { runtimeState } : {}),
       });
-    });
+    }));
     return Object.freeze({
       plugins: Object.freeze(plugins),
       rejected: Object.freeze(discovery.rejected.map((item) => Object.freeze({
@@ -95,6 +103,22 @@ export class PluginManagerService {
         }))),
       }))),
     });
+  }
+
+  async setEnabled(id: unknown, version: unknown, enabled: unknown): Promise<PluginManagerSnapshot> {
+    const [pluginId, pluginVersion] = validateIdentity(id, version);
+    if (typeof enabled !== "boolean") throw new TypeError("Plugin enabled state must be boolean.");
+    if (!this.#options.enabledStore) throw new Error("Persistent plugin enable state is unavailable.");
+    const plugin = await this.#find(pluginId, pluginVersion);
+    await this.#options.enabledStore.setEnabled(pluginId, pluginVersion, enabled);
+    if (enabled) {
+      const report = await this.#options.approvals.inspect(await this.#discover());
+      const ready = report.plugins.find((item) => item.id === pluginId && item.version === pluginVersion);
+      if (ready) await this.#startIfReady(ready);
+    } else {
+      await this.#options.runtime.unload(pluginId);
+    }
+    return this.refresh();
   }
 
   async trust(id: unknown, version: unknown): Promise<PluginManagerSnapshot> {
