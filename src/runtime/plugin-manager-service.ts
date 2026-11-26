@@ -177,7 +177,7 @@ export class PluginManagerService {
     if (plugin.state !== "READY" || plugin.trusted !== true) {
       throw new Error("Only trusted, fully approved plugins can be started.");
     }
-    if (this.#options.enabledStore && !(await this.#options.enabledStore.isEnabled(pluginId, pluginVersion))) {
+    if (this.#options.enabledStore && !(await this.#options.enabledStore.isEnabled(pluginId))) {
       throw new Error("This plugin is disabled. Enable it from the Plugins page first.");
     }
     await this.#startIfReady(plugin);
