@@ -69,7 +69,10 @@ test("audio store rejects unsupported, malformed, and longer-than-three-second f
     const broken = new Uint8Array(128);
     broken.set([0xff, 0xfb, 0x00, 0x00]);
     await assert.rejects(store.importAudio("broken.mp3", broken), /malformed|decodable frames/);
-    await assert.rejects(store.importAudio("long.ogg", oggVorbis(132301n)), /no more than 3 seconds/);
+    const nominalThreeSecondMp3 = await store.importAudio("three-seconds.mp3", mp3Frames(115));
+    assert.equal(nominalThreeSecondMp3.duration, 3, "MP3 frame padding is normalized at the three-second boundary");
+    await assert.rejects(store.importAudio("long.mp3", mp3Frames(117)), /no more than 3 seconds/);
+        await assert.rejects(store.importAudio("long.ogg", oggVorbis(132301n)), /no more than 3 seconds/);
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }
