@@ -13,7 +13,7 @@ npm run build
 npm run install-managed -- "$HOME/Downloads/Executables/Yapper-Setup.AppImage"
 ```
 
-The managed runtime is version `0.1.9`. Re-running the managed installer updates the runtime and rewrites the Yapin' desktop entry without replacing an already-managed AppDir with a different payload.
+The managed runtime is version `0.1.10`. Re-running the managed installer updates the runtime and rewrites the Yapin' desktop entry without replacing an already-managed AppDir with a different payload.
 
 ## Open the manager
 
@@ -25,7 +25,7 @@ Terminal fallback:
 
 ```fish
 set APPDIR "$HOME/.local/share/yplusplus/versions/yapper-desktop-1.2.7"
-node "$HOME/.local/share/yplusplus/runtime/0.1.9/cli.js" launch "$APPDIR" --yplusplus-plugin-manager
+node "$HOME/.local/share/yplusplus/runtime/0.1.10/cli.js" launch "$APPDIR" --yplusplus-plugin-manager
 ```
 
 ## Native Settings integration
