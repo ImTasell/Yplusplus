@@ -136,7 +136,7 @@ try {
           document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
           fontStyleSheet = sheet;
         } else if (document.documentElement) {
-          document.documentElement.style.setProperty("--yplusplus-font-family", "\"" + font.family + "\", sans-serif", "important");
+          document.documentElement.style.setProperty("--yplusplus-font-family", JSON.stringify(font.family) + ", sans-serif", "important");
         }
       } catch (error) {
         // The main-process settings handlers may still be starting when the
