@@ -15,7 +15,11 @@ const CHANNELS = Object.freeze({
   fontImport: "yplusplus:settings-page:font-import",
   fontRemove: "yplusplus:settings-page:font-remove",
   fontSelect: "yplusplus:settings-page:font-select",
-  fontActive: "yplusplus:settings-page:font-active"
+  fontActive: "yplusplus:settings-page:font-active",
+  audioImport: "yplusplus:settings-page:audio-import",
+  audioRemove: "yplusplus:settings-page:audio-remove",
+  audioSelect: "yplusplus:settings-page:audio-select",
+  audioActive: "yplusplus:settings-page:audio-active"
 });
 
 try {
@@ -55,7 +59,11 @@ try {
         await applyActiveFont();
         return result;
       },
-      activeFont: () => ipcRenderer.invoke(CHANNELS.fontActive)
+      activeFont: () => ipcRenderer.invoke(CHANNELS.fontActive),
+      importAudio: (fileName, bytes) => ipcRenderer.invoke(CHANNELS.audioImport, fileName, bytes),
+      removeAudio: (audioId) => ipcRenderer.invoke(CHANNELS.audioRemove, audioId),
+      selectAudio: (audioId) => ipcRenderer.invoke(CHANNELS.audioSelect, audioId),
+      activeAudio: () => ipcRenderer.invoke(CHANNELS.audioActive)
     });
     contextBridge.exposeInMainWorld("yplusplus", {
       version: VERSION,
@@ -398,6 +406,102 @@ try {
         });
         actions.append(useButton, removeButton);
         row.append(name, actions);
+        list.append(row);
+      }
+      section.append(list);
+      return section;
+    };
+
+    const renderHelloAudioLibrary = (plugin, snapshot) => {
+      const section = styled(element("section", "yplusplus-audio-library"), {
+        borderTop: "1px solid #3a4050", marginTop: "18px", paddingTop: "16px"
+      });
+      section.append(element("h3", "", "Startup audio"));
+      section.append(styled(element("p", "yplusplus-popup-hint",
+        "Import an MP3 or OGG file up to 3 seconds long. It stays in your private Y++ data directory and plays once when Yapin' finishes loading."),
+      { fontSize: "12px", opacity: "0.72", lineHeight: "1.5" }));
+      const input = element("input", "");
+      input.type = "file";
+      input.accept = ".mp3,.ogg,audio/mpeg,audio/ogg";
+      input.hidden = true;
+      input.addEventListener("change", async (event) => {
+        if (!event.isTrusted) return;
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+          section.append(styled(element("p", "", "Audio files may not exceed 5 MiB."), { color: "#ff9ea8", fontSize: "12px" }));
+          input.value = "";
+          return;
+        }
+        try {
+          await pluginActions.importAudio(file.name, new Uint8Array(await file.arrayBuffer()));
+          await openPluginSettings(plugin);
+        } catch (error) {
+          section.append(styled(element("p", "", error instanceof Error ? error.message : "Unable to import audio."),
+            { color: "#ff9ea8", fontSize: "12px" }));
+        }
+      });
+      const importButton = element("button", "", "Import MP3 / OGG…");
+      importButton.type = "button";
+      styled(importButton, { border: "0", borderRadius: "8px", padding: "9px 12px", cursor: "pointer",
+        background: "#c8caff", color: "#20223a", fontWeight: "700" });
+      importButton.addEventListener("click", (event) => { if (event.isTrusted) input.click(); });
+      section.append(importButton, input);
+      const list = styled(element("div", "", ""), { display: "grid", gap: "8px", marginTop: "14px" });
+      if (!snapshot.audio || snapshot.audio.length === 0) {
+        list.append(styled(element("p", "", "No startup audio imported yet."), { fontSize: "12px", opacity: "0.7" }));
+      }
+      for (const audio of snapshot.audio || []) {
+        const row = styled(element("div", "", ""), { display: "flex", alignItems: "center", gap: "8px",
+          justifyContent: "space-between", padding: "10px", borderRadius: "9px", background: "#222631" });
+        const details = styled(element("div", "", audio.name + " · " + audio.format.toUpperCase() + " · " + audio.duration.toFixed(2) + "s"),
+          { fontSize: "12px", minWidth: "0", overflowWrap: "anywhere" });
+        const actions = styled(element("div", "", ""), { display: "flex", gap: "6px", flexShrink: "0" });
+        const use = element("button", "", audio.active ? "Selected" : "Use");
+        use.type = "button";
+        use.disabled = Boolean(audio.active);
+        styled(use, { border: "0", borderRadius: "7px", padding: "6px 9px",
+          background: audio.active ? "#31493e" : "#34394a", color: "inherit", cursor: "pointer" });
+        use.addEventListener("click", async (event) => {
+          if (!event.isTrusted) return;
+          try { await pluginActions.selectAudio(audio.id); await openPluginSettings(plugin); }
+          catch (error) { use.title = error instanceof Error ? error.message : "Unable to select audio."; }
+        });
+        const preview = element("button", "", "Preview");
+        preview.type = "button";
+        styled(preview, { border: "0", borderRadius: "7px", padding: "6px 9px", background: "#34394a", color: "inherit", cursor: "pointer" });
+        preview.addEventListener("click", async (event) => {
+          if (!event.isTrusted) return;
+          try {
+            await pluginActions.selectAudio(audio.id);
+            const active = await pluginActions.activeAudio();
+            if (!active) throw new Error("Select an audio file first.");
+            const blob = new Blob([new Uint8Array(active.bytes)], { type: active.mimeType });
+            const url = URL.createObjectURL(blob);
+            const player = element("audio", "");
+            player.controls = true;
+            player.src = url;
+            player.onended = () => URL.revokeObjectURL(url);
+            player.onerror = () => URL.revokeObjectURL(url);
+            const old = section.querySelector("audio");
+            if (old) { old.pause(); old.remove(); }
+            section.append(player);
+            await player.play();
+          } catch (error) {
+            section.append(styled(element("p", "", error instanceof Error ? error.message : "Unable to preview audio."),
+              { color: "#ff9ea8", fontSize: "12px" }));
+          }
+        });
+        const remove = element("button", "", "Remove");
+        remove.type = "button";
+        styled(remove, { border: "0", borderRadius: "7px", padding: "6px 9px", background: "#48272d", color: "#ffbdc4", cursor: "pointer" });
+        remove.addEventListener("click", async (event) => {
+          if (!event.isTrusted) return;
+          try { await pluginActions.removeAudio(audio.id); await openPluginSettings(plugin); }
+          catch (error) { remove.title = error instanceof Error ? error.message : "Unable to remove audio."; }
+        });
+        actions.append(use, preview, remove);
+        row.append(details, actions);
         list.append(row);
       }
       section.append(list);
