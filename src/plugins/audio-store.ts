@@ -123,10 +123,13 @@ function inspectAudio(fileName: string, input: Uint8Array): { format: "mp3" | "o
   } else {
     throw new TypeError("Choose a valid .mp3 or .ogg audio file.");
   }
-  if (!Number.isFinite(duration) || duration <= 0 || duration > MAX_DURATION_SECONDS) {
+  // MP3 is quantized to whole frames (~26 ms); allow one frame of encoder
+  // padding so a nominal three-second clip is not rejected at 3.003 seconds.
+  const limit = MAX_DURATION_SECONDS + (format === "mp3" ? 0.03 : 0);
+  if (!Number.isFinite(duration) || duration <= 0 || duration > limit) {
     throw new RangeError("Startup audio must be longer than 0 and no more than 3 seconds.");
   }
-  return { format, duration, mimeType: format === "mp3" ? "audio/mpeg" : "audio/ogg" };
+  return { format, duration: Math.min(duration, MAX_DURATION_SECONDS), mimeType: format === "mp3" ? "audio/mpeg" : "audio/ogg" };
 }
 function cleanName(fileName: string): string {
   const name = fileName.replace(/[\\/]/g, "_").replace(/[\u0000-\u001f\u007f]/g, "").trim();
