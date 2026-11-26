@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { FontStore } from "../plugins/font-store.js";
 import type { PluginSettingsStore } from "../plugins/plugin-settings-store.js";
-import type { PluginSettingsPanelRegistry, RegisteredSettingsPanel } from "../plugins/plugin-settings-panel-registry.js";
+import { validateSettingsPanel, type PluginSettingsPanelRegistry, type RegisteredSettingsPanel } from "../plugins/plugin-settings-panel-registry.js";
 import type { PluginManagerService } from "./plugin-manager-service.js";
 
 interface SettingsPageFrame {
@@ -32,6 +32,22 @@ const CHANNELS = [
 ] as const;
 const ALLOWED_HOSTS = new Set(["www.yapper.website", "yapper.website", "www.yapin.gg", "yapin.gg"]);
 const FONTS_PLUGIN_ID = "dev.yplusplus.fonts";
+const BUILTIN_FONTS_PANEL: RegisteredSettingsPanel = Object.freeze({
+  pluginId: FONTS_PLUGIN_ID,
+  panel: validateSettingsPanel({
+    id: "fonts",
+    title: "Fonts",
+    description: "Manage imported TrueType fonts and choose the font used by Yapin'.",
+    icon: "palette",
+    items: [{
+      type: "toggle",
+      id: "apply",
+      label: "Apply selected font",
+      description: "Use the selected TTF font throughout the app while Fonts is enabled.",
+      defaultValue: true,
+    }],
+  }),
+});
 
 function isAllowedFrame(event: SettingsPageEvent): boolean {
   if (event.sender.isDestroyed() || !event.senderFrame ||
@@ -51,7 +67,10 @@ function settingKey(panelId: string, itemId: string): string {
 
 function findItem(registry: PluginSettingsPanelRegistry, pluginId: string, panelId: string, itemId: string) {
   const registered = registry.list().find((entry) =>
-    entry.pluginId === pluginId && entry.panel.id === panelId);
+    entry.pluginId === pluginId && entry.panel.id === panelId) ??
+    (pluginId === FONTS_PLUGIN_ID && panelId === BUILTIN_FONTS_PANEL.panel.id
+      ? BUILTIN_FONTS_PANEL
+      : undefined);
   const item = registered?.panel.items.find((candidate) => candidate.id === itemId);
   if (!registered || !item) throw new Error("This plugin setting is no longer available.");
   return { registered, item };
@@ -85,11 +104,16 @@ export function installPluginSettingsPageIpc(options: PluginSettingsPageIpcOptio
   const handlers: readonly [string, (event: SettingsPageEvent, ...args: unknown[]) => unknown][] = [
     [CHANNELS[0], async (event) => {
       if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ settings request.");
-      const [snapshot, panels, fonts] = await Promise.all([
+      const [snapshot, registeredPanels, fonts] = await Promise.all([
         options.service.refresh(),
         Promise.resolve(options.registry.list()),
         options.fonts.list(),
       ]);
+      const panels = [...registeredPanels];
+      if (snapshot.plugins.some((plugin) => plugin.id === FONTS_PLUGIN_ID) &&
+          !panels.some((entry) => entry.pluginId === FONTS_PLUGIN_ID && entry.panel.id === BUILTIN_FONTS_PANEL.panel.id)) {
+        panels.push(BUILTIN_FONTS_PANEL);
+      }
       return Object.freeze({
         plugins: snapshot.plugins.map(({ id, name, version, state, trusted, enabled, runtimeState }) =>
           Object.freeze({ id, name, version, state, trusted, enabled, runtimeState })),
