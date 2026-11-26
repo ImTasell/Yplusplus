@@ -114,6 +114,7 @@ export function installPluginSettingsPageIpc(options: PluginSettingsPageIpcOptio
         options.service.refresh(),
         Promise.resolve(options.registry.list()),
         options.fonts.list(),
+        options.audio.list(),
       ]);
       const panels = [...registeredPanels];
       if (snapshot.plugins.some((plugin) => plugin.id === FONTS_PLUGIN_ID) &&
@@ -125,6 +126,7 @@ export function installPluginSettingsPageIpc(options: PluginSettingsPageIpcOptio
           Object.freeze({ id, name, version, state, trusted, enabled, runtimeState })),
         panels: panels.map(({ pluginId, panel }) => Object.freeze({ pluginId, panel })),
         fonts,
+        audio,
       });
     }],
     [CHANNELS[1], async (event, pluginId, panelId, itemId) => {
@@ -173,6 +175,29 @@ export function installPluginSettingsPageIpc(options: PluginSettingsPageIpcOptio
       const apply = await options.store.get(FONTS_PLUGIN_ID, settingKey("fonts", "apply"), true);
       if (!apply) return null;
       return options.fonts.getActive();
+    }],
+    [CHANNELS[8], async (event, fileName, bytes) => {
+      if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ audio import request.");
+      if (!isFontBytes(bytes)) throw new TypeError("Audio upload must contain binary data.");
+      await options.audio.importAudio(fileName, bytes);
+      return options.audio.list();
+    }],
+    [CHANNELS[9], async (event, audioId) => {
+      if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ audio request.");
+      await options.audio.remove(audioId);
+      return options.audio.list();
+    }],
+    [CHANNELS[10], async (event, audioId) => {
+      if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ audio request.");
+      await options.audio.select(audioId);
+      return options.audio.list();
+    }],
+    [CHANNELS[11], async (event) => {
+      if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ audio request.");
+      const snapshot = await options.service.refresh();
+      const hello = snapshot.plugins.find((plugin) => plugin.id === "dev.yplusplus.hello");
+      if (!hello || !hello.trusted || !hello.enabled) return null;
+      return options.audio.getActive();
     }],
   ];
   for (const [channel, handler] of handlers) options.ipcMain.handle(channel, handler);
