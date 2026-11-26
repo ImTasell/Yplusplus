@@ -5,16 +5,15 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { PluginEnabledStore } from "../../src/plugins/plugin-enabled-store.js";
 
-test("plugin enable preferences default on and persist exact release overrides", async () => {
+test("plugin enable preferences default on and persist by stable plugin ID", async () => {
   const root = await mkdtemp(join(tmpdir(), "yplusplus-plugin-enabled-"));
   const store = new PluginEnabledStore({ filePath: join(root, "enabled.json") });
   try {
-    assert.equal(await store.isEnabled("dev.example.plugin", "1.0.0"), true);
-    await store.setEnabled("dev.example.plugin", "1.0.0", false);
-    assert.equal(await store.isEnabled("dev.example.plugin", "1.0.0"), false);
-    assert.equal(await store.isEnabled("dev.example.plugin", "1.1.0"), true);
-    await store.setEnabled("dev.example.plugin", "1.0.0", true);
-    assert.equal(await store.isEnabled("dev.example.plugin", "1.0.0"), true);
+    assert.equal(await store.isEnabled("dev.example.plugin"), true);
+    await store.setEnabled("dev.example.plugin", false);
+    assert.equal(await store.isEnabled("dev.example.plugin"), false);
+    await store.setEnabled("dev.example.plugin", true);
+    assert.equal(await store.isEnabled("dev.example.plugin"), true);
     const document = JSON.parse(await readFile(join(root, "enabled.json"), "utf8"));
     assert.deepEqual(document, { storeVersion: 1, disabled: [] });
   } finally {
@@ -26,9 +25,11 @@ test("plugin enable store rejects malformed identities and invalid values", asyn
   const root = await mkdtemp(join(tmpdir(), "yplusplus-plugin-enabled-invalid-"));
   const store = new PluginEnabledStore({ filePath: join(root, "enabled.json") });
   try {
-    await assert.rejects(store.isEnabled("../escape", "1.0.0"), /plugin ID/);
-    await assert.rejects(store.setEnabled("dev.example.plugin", "latest", false), /SemVer/);
-    await assert.rejects((store.setEnabled as (id: string, version: string, value: unknown) => Promise<void>)("dev.example.plugin", "1.0.0", "false"), /boolean/);
+    await assert.rejects(store.isEnabled("../escape"), /plugin ID/);
+    await assert.rejects(
+      (store.setEnabled as (id: string, value: unknown) => Promise<void>)("dev.example.plugin", "false"),
+      /boolean/
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
