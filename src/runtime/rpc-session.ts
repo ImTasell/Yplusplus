@@ -26,7 +26,12 @@ export class PluginRpcSession {
     if (!Number.isSafeInteger(this.#timeoutMs) || this.#timeoutMs < 50 || this.#timeoutMs > 60_000) throw new RangeError("requestTimeoutMs must be an integer from 50 to 60000.");
   }
   get inFlightRequests(): number { return this.#inFlight; }
-  setEventSink(sink: ((event: RpcPluginEvent) => void) | undefined): void { this.#eventSink = sink; }\n  emitApplicationReady(timestamp: number): void {\n    if (this.#closed || !this.#eventSink || !Number.isFinite(timestamp)) return;\n    try { this.#eventSink(Object.freeze({ rpcVersion: YPLUSPLUS_RPC_VERSION, type: "event", event: "application.ready", payload: Object.freeze({ timestamp }) })); }\n    catch { /* transport closure is handled by its owner */ }\n  }
+  setEventSink(sink: ((event: RpcPluginEvent) => void) | undefined): void { this.#eventSink = sink; }
+  emitApplicationReady(timestamp: number): void {
+    if (this.#closed || !this.#eventSink || !Number.isFinite(timestamp)) return;
+    try { this.#eventSink(Object.freeze({ rpcVersion: YPLUSPLUS_RPC_VERSION, type: "event", event: "application.ready", payload: Object.freeze({ timestamp }) })); }
+    catch { /* transport closure is handled by its owner */ }
+  }
   close(): void { if (this.#closed) return; this.#closed = true; this.#eventSink = undefined; for (const dispose of this.#subscriptions.values()) dispose(); this.#subscriptions.clear(); for (const dispose of this.#panelDisposers.values()) dispose(); this.#panelDisposers.clear(); }
   async dispatch(input: unknown): Promise<RpcResponse> {
     let request;
@@ -86,7 +91,11 @@ export class PluginRpcSession {
     }
 
     let operation: Promise<RpcSettingValue | null>;
-    if (request.method === "audio.playStartup") {\n      const playStartup = this.#facade.audio?.playStartup;\n      if (!playStartup) return rpcFailure(request.requestId, "CAPABILITY_DENIED", "Startup audio is not available to this plugin.");\n      operation = Promise.resolve().then(() => playStartup()).then(() => null);\n    } else if (request.method === "capabilities.notifications.show") {
+    if (request.method === "audio.playStartup") {
+      const playStartup = this.#facade.audio?.playStartup;
+      if (!playStartup) return rpcFailure(request.requestId, "CAPABILITY_DENIED", "Startup audio is not available to this plugin.");
+      operation = Promise.resolve().then(() => playStartup()).then(() => null);
+    } else if (request.method === "capabilities.notifications.show") {
       const show = this.#facade.notifications?.show;
       if (!show) return rpcFailure(request.requestId, "CAPABILITY_DENIED", "ui.notifications is not available to this plugin.");
       operation = Promise.resolve().then(() => show({ title: request.payload.title as string, message: request.payload.message as string })).then(() => null);
