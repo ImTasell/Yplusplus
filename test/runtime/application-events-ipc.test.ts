@@ -26,12 +26,12 @@ function webContents(url: string) {
 test("application-ready IPC validates the main frame and only signals each renderer once", async () => {
   const ipc = new FakeIpcMain();
   const timestamps: number[] = [];
-  const runtime = { emitApplicationReady: (timestamp: number) => timestamps.push(timestamp) };
+  const onApplicationReady = (timestamp: number) => timestamps.push(timestamp);
   const audio = { getActive: async () => ({
     bytes: new Uint8Array([1, 2, 3]),
     mimeType: "audio/mpeg",
   }) };
-  const bridge = installApplicationEventsIpc({ ipcMain: ipc, runtime: runtime as never, audio: audio as never });
+  const bridge = installApplicationEventsIpc({ ipcMain: ipc, onApplicationReady, audio: audio as never });
   const contents = webContents("https://yapper.website/home");
   const event = { sender: contents, senderFrame: contents.mainFrame };
   try {
