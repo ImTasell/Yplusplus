@@ -139,7 +139,7 @@ export function installPluginSettingsPageIpc(options: PluginSettingsPageIpcOptio
       if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ font request.");
       const snapshot = await options.service.refresh();
       const fontsPlugin = snapshot.plugins.find((plugin) => plugin.id === FONTS_PLUGIN_ID);
-      if (!fontsPlugin || !fontsPlugin.enabled || fontsPlugin.runtimeState !== "ACTIVE") return null;
+      if (!fontsPlugin || !fontsPlugin.trusted || !fontsPlugin.enabled) return null;
       const apply = await options.store.get(FONTS_PLUGIN_ID, settingKey("fonts", "apply"), true);
       if (!apply) return null;
       return options.fonts.getActive();
