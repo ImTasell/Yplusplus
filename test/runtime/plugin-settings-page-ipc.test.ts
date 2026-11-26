@@ -94,3 +94,57 @@ test("native settings IPC exposes only registered plugin settings and validates 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+
+test("active TTF is returned only while the trusted Fonts plugin is enabled", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "yplusplus-font-ipc-"));
+  const ipc = new FakeIpcMain();
+  const store = new PluginSettingsStore({ directory: join(directory, "settings") });
+  const fonts = new FontStore({ directory: join(directory, "fonts") });
+  const registry = new PluginSettingsPanelRegistry();
+  let trusted = true;
+  let enabled = true;
+  const service = {
+    refresh: async () => ({
+      plugins: [{
+        id: "dev.yplusplus.fonts",
+        name: "Fonts",
+        version: "1.0.0",
+        state: "READY",
+        trusted,
+        enabled,
+        runtimeState: "UNLOADED",
+      }],
+      rejected: [],
+    }),
+  };
+  const dispose = installPluginSettingsPageIpc({
+    ipcMain: ipc,
+    service: service as never,
+    registry,
+    store,
+    fonts,
+  });
+  const mainFrame = { url: "https://yapper.website/settings" };
+  const event = { sender: { mainFrame, isDestroyed: () => false }, senderFrame: mainFrame };
+  try {
+    const bytes = new Uint8Array(12);
+    new DataView(bytes.buffer).setUint32(0, 0x00010000, false);
+    const font = await fonts.importFont("Private.ttf", bytes);
+    await fonts.setActive(font.id);
+
+    const activeFont = ipc.handlers.get("yplusplus:settings-page:font-active")!;
+    const active = await activeFont(event) as { readonly family: string; readonly bytes: Uint8Array } | null;
+    assert.equal(active?.family, "YPlusPlusFont_" + font.id);
+    assert.deepEqual(Array.from(active?.bytes ?? []), Array.from(bytes));
+
+    enabled = false;
+    assert.equal(await activeFont(event), null);
+    enabled = true;
+    trusted = false;
+    assert.equal(await activeFont(event), null);
+  } finally {
+    dispose();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
