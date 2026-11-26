@@ -6,7 +6,8 @@
  */
 import { cp, lstat, mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PluginApprovalController } from "../plugins/approval-controller.js";
 import { PluginSettingsStore } from "../plugins/plugin-settings-store.js";
 import { PluginEnabledStore } from "../plugins/plugin-enabled-store.js";
