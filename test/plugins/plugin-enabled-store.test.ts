@@ -15,7 +15,7 @@ test("plugin enable preferences default on and persist by stable plugin ID", asy
     await store.setEnabled("dev.example.plugin", true);
     assert.equal(await store.isEnabled("dev.example.plugin"), true);
     const document = JSON.parse(await readFile(join(root, "enabled.json"), "utf8"));
-    assert.deepEqual(document, { storeVersion: 1, disabled: [] });
+    assert.deepEqual(document, { storeVersion: 2, disabled: [] });
   } finally {
     await rm(root, { recursive: true, force: true });
   }
