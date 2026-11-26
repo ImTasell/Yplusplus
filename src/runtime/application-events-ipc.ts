@@ -1,15 +1,14 @@
 import type { AudioStore } from "../plugins/audio-store.js";
 import type { PluginRuntimeHost } from "./host.js";
 
-interface ApplicationFrame { readonly url?: string; }
 interface ApplicationWebContents {
   readonly mainFrame: unknown;
   isDestroyed(): boolean;
-  send(channel: string, ...args: unknown[]): void;
+  send?(channel: string, ...args: unknown[]): void;
 }
 interface ApplicationIpcEvent {
   readonly sender: ApplicationWebContents;
-  readonly senderFrame?: ApplicationFrame | null;
+  readonly senderFrame?: unknown;
 }
 interface ApplicationIpcMain {
   on(channel: string, listener: (event: ApplicationIpcEvent, ...args: unknown[]) => void): void;
@@ -26,7 +25,8 @@ const ALLOWED_HOSTS = new Set(["www.yapper.website", "yapper.website", "www.yapi
 
 function isAllowedMainFrame(event: ApplicationIpcEvent): boolean {
   if (event.sender.isDestroyed() || !event.senderFrame ||
-      event.senderFrame !== event.sender.mainFrame || typeof event.senderFrame.url !== "string") return false;
+      event.senderFrame !== event.sender.mainFrame || typeof event.senderFrame !== "object" ||
+      !("url" in event.senderFrame) || typeof event.senderFrame.url !== "string") return false;
   try {
     const url = new URL(event.senderFrame.url);
     return url.protocol === "https:" && ALLOWED_HOSTS.has(url.hostname);
@@ -54,6 +54,7 @@ export function installApplicationEventsIpc(options: ApplicationEventsIpcOptions
       if (!active) return;
       for (const sender of [...readySenders]) {
         if (sender.isDestroyed()) { readySenders.delete(sender); continue; }
+        if (typeof sender.send !== "function") continue;
         sender.send(PLAY_CHANNEL, Object.freeze({
           bytes: active.bytes,
           mimeType: active.mimeType,
