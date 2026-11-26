@@ -1,5 +1,4 @@
 import type { AudioStore } from "../plugins/audio-store.js";
-import type { PluginRuntimeHost } from "./host.js";
 
 interface ApplicationWebContents {
   readonly mainFrame: unknown;
@@ -16,7 +15,7 @@ interface ApplicationIpcMain {
 }
 export interface ApplicationEventsIpcOptions {
   readonly ipcMain: ApplicationIpcMain;
-  readonly runtime: PluginRuntimeHost;
+  readonly onApplicationReady: (timestamp: number) => void;
   readonly audio: AudioStore;
 }
 const READY_CHANNEL = "yplusplus:application:ready";
@@ -44,7 +43,7 @@ export function installApplicationEventsIpc(options: ApplicationEventsIpcOptions
     if (!isAllowedMainFrame(event) || signalled.has(event.sender)) return;
     signalled.add(event.sender);
     readySenders.add(event.sender);
-    options.runtime.emitApplicationReady(Date.now());
+    options.onApplicationReady(Date.now());
   };
   options.ipcMain.on(READY_CHANNEL, onReady);
   return Object.freeze({
