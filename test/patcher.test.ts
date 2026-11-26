@@ -162,7 +162,7 @@ test("launch environment removes APPIMAGE to protect extracted AppRun from auto-
   });
   assert.equal(env.APPIMAGE, undefined);
   assert.equal(env.APPDIR, "/opt/yplusplus/yapper");
-  assert.equal(env.YPLUSPLUS_RUNTIME_ENTRY, "/tmp/yplusplus-test-data/yplusplus/runtime/0.1.8/runtime/bootstrap.js");
+  assert.equal(env.YPLUSPLUS_RUNTIME_ENTRY, "/tmp/yplusplus-test-data/yplusplus/runtime/0.1.9/runtime/bootstrap.js");
   assert.equal(env.YPLUSPLUS_PLUGIN_DIR, "/tmp/yplusplus-test-data/yplusplus/plugins");
   assert.ok(env.PATH?.startsWith("/opt/yplusplus/yapper:"));
   assert.ok(env.LD_LIBRARY_PATH?.startsWith("/opt/yplusplus/yapper/usr/lib:"));
