@@ -66,7 +66,7 @@ test("audio store rejects unsupported, malformed, and longer-than-three-second f
   try {
     const store = new AudioStore({ directory: path.join(temporary, "audio") });
     await assert.rejects(store.importAudio("sound.wav", mp3Frames(2)), /valid \.mp3 or \.ogg/);
-    await assert.rejects(store.importAudio("broken.mp3", new Uint8Array(128)), /malformed|decodable frames/);
+    const broken = new Uint8Array(128);\n    broken.set([0xff, 0xfb, 0x00, 0x00]);\n    await assert.rejects(store.importAudio("broken.mp3", broken), /malformed|decodable frames/);
     await assert.rejects(store.importAudio("long.ogg", oggVorbis(132301n)), /no more than 3 seconds/);
   } finally {
     await rm(temporary, { recursive: true, force: true });
