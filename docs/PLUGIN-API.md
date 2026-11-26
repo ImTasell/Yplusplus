@@ -162,12 +162,27 @@ are disposed when the RPC session closes.
 
 Settings-panel definitions are validated by the host-owned registry and
 registered/unregistered over plugin RPC. The native Yapin Settings integration
-adds a Plugins navigation entry and renders the host-validated toggle, text,
-number, and select controls inside the existing Settings modal. Its IPC surface
-is read/write-only and validates the requesting main frame, registered panel,
-item identity, and value type/range. It does not expose plugin trust, approval,
-or lifecycle actions to the remote renderer. Settings values are persisted by
-the host, and panel registrations disappear when their plugin session closes.
+adds a Plugins navigation entry and places its content beside (not inside)
+Yapin's native settings-page container. This prevents native page switching
+from treating the injected Plugins view as one of its own pages. Each plugin
+has a host-owned enable switch and gear button; the gear opens a popup that
+renders host-validated toggle, text, number, and select controls. Plugin code
+cannot supply arbitrary HTML, CSS, or renderer-side callbacks.
+
+Enable state is persisted by stable plugin ID across release updates. Disabling
+unloads the plugin runtime; enabling only starts a release that already has
+explicit trust and every requested capability approval. Enable state does not
+grant trust or permissions. IPC validates the requesting main frame, plugin
+identity, registered panel, item identity, and setting value type/range. The
+remote renderer receives no trust-store, approval-store, or raw lifecycle API.
+
+The first-party Fonts plugin is bundled by Y++ and seeded into the plugin
+directory on first launch. Its host-owned font library accepts TrueType TTF
+files up to 12 MiB each (64 installed fonts maximum), stores files under
+generated names with private permissions, and applies the selected font only
+while Fonts is enabled and its Apply selected font setting is on. Font import,
+selection, and removal do not expose filesystem paths or Node APIs to the
+plugin.
 
 Logging and application lifecycle events remain follow-on implementation
 batches. The public `src/plugins/api.ts` contract remains the source of truth
