@@ -44,7 +44,7 @@ async function setup() {
       return { id: "dev.example.notification", version: "1.0.0", state: "ACTIVE" as const };
     },
     unload: async () => {
-      unloads += 1;
+      if (runtimeState && runtimeState !== "UNLOADED") unloads += 1;
       runtimeState = "UNLOADED";
       return { id: "dev.example.notification", version: "1.0.0", state: "UNLOADED" as const };
     },
