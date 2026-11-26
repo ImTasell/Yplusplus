@@ -49,6 +49,7 @@ interface RuntimeRecord {
   readonly plugin: ManagedPlugin;
   state: PluginState;
   readonly transport: RpcPortTransport;
+  readonly session: PluginRpcSession;
   readonly pluginPort: RpcMessagePort;
   readonly abortController: AbortController;
   handle?: PluginExecutionHandle;
@@ -113,13 +114,13 @@ export class PluginRuntimeHost {
 
     const channel = this.#options.createChannel();
     let transport: RpcPortTransport;
+    let session: PluginRpcSession;
     try {
       let sessionTimeout: ReturnType<typeof setTimeout> | undefined;
       const sessionPromise = Promise.resolve(this.#options.createSession(plugin));
       const sessionTimedOut = new Promise<never>((_, reject) => {
         sessionTimeout = setTimeout(() => reject(new Error("Plugin session setup timed out.")), this.#startupTimeoutMs);
       });
-      let session: PluginRpcSession;
       try {
         session = await Promise.race([sessionPromise, sessionTimedOut]);
       } finally {
@@ -136,6 +137,7 @@ export class PluginRuntimeHost {
       plugin,
       state: "READY",
       transport,
+      session,
       pluginPort: channel.pluginPort,
       abortController,
       starting: true,
