@@ -65,8 +65,7 @@ try {
         ready: true,
         version: VERSION,
         origin: currentUrl.origin
-      }),
-      settingsPage
+      })
     });
 
     if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
