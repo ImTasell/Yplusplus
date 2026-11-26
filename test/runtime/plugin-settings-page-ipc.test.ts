@@ -36,6 +36,7 @@ test("native settings IPC exposes only registered plugin settings and validates 
   const store = new PluginSettingsStore({ directory });
   const fonts = new FontStore({ directory: join(directory, "fonts") });
   const audio = new AudioStore({ directory: join(directory, "audio") });
+  const audio = new AudioStore({ directory: join(directory, "audio") });
   const registry = new PluginSettingsPanelRegistry();
   registry.register("dev.example.plugin", definition);
   const service = {
@@ -104,6 +105,7 @@ test("active TTF is returned only while the trusted Fonts plugin is enabled", as
   const ipc = new FakeIpcMain();
   const store = new PluginSettingsStore({ directory: join(directory, "settings") });
   const fonts = new FontStore({ directory: join(directory, "fonts") });
+  const audio = new AudioStore({ directory: join(directory, "audio") });
   const registry = new PluginSettingsPanelRegistry();
   let trusted = true;
   let enabled = true;
@@ -127,6 +129,7 @@ test("active TTF is returned only while the trusted Fonts plugin is enabled", as
     registry,
     store,
     fonts,
+    audio,
   });
   const mainFrame = { url: "https://yapper.website/settings" };
   const event = { sender: { mainFrame, isDestroyed: () => false }, senderFrame: mainFrame };
