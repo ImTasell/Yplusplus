@@ -287,3 +287,43 @@ test("rejects duplicate settings panel registrations within one RPC session", as
   assert.equal(calls, 1);
   session.close();
 });
+
+
+test("dispatches the fixed Hello startup audio request", async () => {
+  let played = 0;
+  const session = new PluginRpcSession({
+    facade: { audio: { playStartup: async () => { played += 1; } } },
+  });
+  const result = await session.dispatch({
+    rpcVersion: YPLUSPLUS_RPC_VERSION,
+    type: "request",
+    requestId: "audio_1",
+    method: "audio.playStartup",
+    payload: {},
+  });
+  assert.equal(result.ok, true);
+  assert.equal(played, 1);
+  assert.throws(() => parseRpcRequest({
+    rpcVersion: YPLUSPLUS_RPC_VERSION,
+    type: "request",
+    requestId: "audio_2",
+    method: "audio.playStartup",
+    payload: { url: "https://example.invalid/sound.mp3" },
+  }), /takes no arguments/);
+});
+
+test("emits the application-ready event to a connected plugin session", () => {
+  const session = new PluginRpcSession({ facade: {} });
+  const events: unknown[] = [];
+  session.setEventSink((event) => events.push(event));
+  session.emitApplicationReady(1234);
+  assert.deepEqual(events, [{
+    rpcVersion: YPLUSPLUS_RPC_VERSION,
+    type: "event",
+    event: "application.ready",
+    payload: { timestamp: 1234 },
+  }]);
+  session.close();
+  session.emitApplicationReady(5678);
+  assert.equal(events.length, 1);
+});
