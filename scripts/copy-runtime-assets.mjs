@@ -13,3 +13,8 @@ const builtinFontsSource = path.join(root, "examples", "fonts-plugin");
 const builtinFontsDestination = path.join(destination, "builtin-plugins", "fonts");
 await mkdir(builtinFontsDestination, { recursive: true });
 await cp(builtinFontsSource, builtinFontsDestination, { recursive: true, force: true });
+
+const builtinHelloSource = path.join(root, "examples", "hello-plugin");
+const builtinHelloDestination = path.join(destination, "builtin-plugins", "hello");
+await mkdir(builtinHelloDestination, { recursive: true });
+await cp(builtinHelloSource, builtinHelloDestination, { recursive: true, force: true });
