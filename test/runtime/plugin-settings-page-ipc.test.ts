@@ -133,7 +133,21 @@ test("active TTF is returned only while the trusted Fonts plugin is enabled", as
     const font = await fonts.importFont("Private.ttf", bytes);
     await fonts.setActive(font.id);
 
+    const snapshot = await ipc.handlers.get("yplusplus:settings-page:snapshot")!(event) as {
+      readonly panels: readonly { readonly pluginId: string; readonly panel: { readonly id: string } }[];
+    };
+    assert.ok(snapshot.panels.some((entry) =>
+      entry.pluginId === "dev.yplusplus.fonts" && entry.panel.id === "fonts"),
+    "the built-in Fonts settings panel remains available when its runtime is stopped");
+
+    const get = ipc.handlers.get("yplusplus:settings-page:get")!;
+    const set = ipc.handlers.get("yplusplus:settings-page:set")!;
+    assert.equal(await get(event, "dev.yplusplus.fonts", "fonts", "apply"), true);
+    await set(event, "dev.yplusplus.fonts", "fonts", "apply", false);
+
     const activeFont = ipc.handlers.get("yplusplus:settings-page:font-active")!;
+    assert.equal(await activeFont(event), null, "the Apply selected font preference can be edited while Fonts is stopped");
+    await set(event, "dev.yplusplus.fonts", "fonts", "apply", true);
     const active = await activeFont(event) as { readonly family: string; readonly bytes: Uint8Array } | null;
     assert.equal(active?.family, "YPlusPlusFont_" + font.id);
     assert.deepEqual(Array.from(active?.bytes ?? []), Array.from(bytes));
