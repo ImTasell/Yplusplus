@@ -76,6 +76,29 @@ async function seedBuiltinFontsPlugin(pluginRoot: string): Promise<{ directory: 
   return Object.freeze({ directory, source, created });
 }
 
+async function seedBuiltinHelloPlugin(pluginRoot: string): Promise<{ directory: string; source: string; created: boolean }> {
+  const runtimeDirectory = join(dirname(fileURLToPath(import.meta.url)), "assets");
+  const source = join(runtimeDirectory, "builtin-plugins", "hello");
+  const directory = join(pluginRoot, "dev.yplusplus.hello");
+  let created = false;
+  try {
+    const info = await lstat(directory);
+    if (info.isSymbolicLink() || !info.isDirectory()) throw new Error("The built-in Hello! plugin path must be a regular directory.");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    const stagingRoot = await mkdtemp(join(pluginRoot, ".yplusplus-hello-"));
+    const stagedPlugin = join(stagingRoot, "plugin");
+    try {
+      await cp(source, stagedPlugin, { recursive: true, errorOnExist: true, force: false });
+      await rename(stagedPlugin, directory);
+      created = true;
+    } finally {
+      await rm(stagingRoot, { recursive: true, force: true });
+    }
+  }
+  return Object.freeze({ directory, source, created });
+}
+
 async function isUnmodifiedBuiltinFontsPlugin(directory: string, source: string): Promise<boolean> {
   try {
     const [installedManifest, bundledManifest, installedEntry, bundledEntry] = await Promise.all([
@@ -108,7 +131,7 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     ? resolve(configuredPluginRoot)
     : join(root, "plugins");
   await mkdir(pluginRoot, { recursive: true, mode: 0o700 });
-  const builtinFonts = await seedBuiltinFontsPlugin(pluginRoot);
+  const builtinFonts = await seedBuiltinFontsPlugin(pluginRoot);\n  const builtinHello = await seedBuiltinHelloPlugin(pluginRoot);
 
   const discovery = await discoverPlugins(pluginRoot);
   const approvals = new PluginApprovalController();
@@ -123,6 +146,14 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     plugin.manifest.version === "1.0.0");
   if (builtinFonts.created && bundledFonts && await isUnmodifiedBuiltinFontsPlugin(builtinFonts.directory, builtinFonts.source)) {
     await approvals.trust(bundledFonts);
+  }
+  const bundledHello = discovery.plugins.find((plugin) =>
+    plugin.directory === builtinHello.directory &&
+    plugin.manifest.id === "dev.yplusplus.hello" &&
+    plugin.manifest.version === "1.0.0");
+  if (builtinHello.created && bundledHello &&
+      await isUnmodifiedBuiltinFontsPlugin(builtinHello.directory, builtinHello.source)) {
+    await approvals.trust(bundledHello);
   }
   const settingsPanelRegistry = new PluginSettingsPanelRegistry();
   const report = await approvals.inspect(discovery);
