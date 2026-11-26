@@ -31,6 +31,11 @@ export interface NotificationsAPI {
   show(request: NotificationRequest): Promise<void>;
 }
 
+export interface AudioAPI {
+  /** Play the user's selected Hello! startup audio. No path or URL is accepted. */
+  playStartup(): Promise<void>;
+}
+
 export type SettingValue = string | number | boolean;
 
 export interface SettingsAPI {
@@ -123,6 +128,7 @@ export interface YPlusPlusAPI {
   readonly plugin: PluginIdentity;
   readonly logger: Logger;
   readonly notifications: NotificationsAPI;
+  readonly audio?: AudioAPI;
   readonly settings: SettingsAPI;
   readonly ui: UIAPI;
   readonly events: EventsAPI;
