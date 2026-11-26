@@ -4,7 +4,7 @@
  * This module is dynamically imported by the version-specific BOOT patch.
  * It owns discovery, trust, approvals, runtime startup, and manager UI.
  */
-import { cp, lstat, mkdir, readFile } from "node:fs/promises";
+import { cp, lstat, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,7 +52,7 @@ export interface YplusplusBootstrapResult {
 async function seedBuiltinFontsPlugin(pluginRoot: string): Promise<{ directory: string; source: string; created: boolean }> {
   const runtimeDirectory = join(dirname(fileURLToPath(import.meta.url)), "assets");
   const source = join(runtimeDirectory, "builtin-plugins", "fonts");
-  const directory = join(pluginRoot, "fonts");
+  const directory = join(pluginRoot, "dev.yplusplus.fonts");
   let created = false;
   try {
     const info = await lstat(directory);
@@ -61,8 +61,15 @@ async function seedBuiltinFontsPlugin(pluginRoot: string): Promise<{ directory: 
     }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    await cp(source, directory, { recursive: true, errorOnExist: true, force: false });
-    created = true;
+    const stagingRoot = await mkdtemp(join(pluginRoot, ".yplusplus-fonts-"));
+    const stagedPlugin = join(stagingRoot, "plugin");
+    try {
+      await cp(source, stagedPlugin, { recursive: true, errorOnExist: true, force: false });
+      await rename(stagedPlugin, directory);
+      created = true;
+    } finally {
+      await rm(stagingRoot, { recursive: true, force: true });
+    }
   }
   return Object.freeze({ directory, source, created });
 }
