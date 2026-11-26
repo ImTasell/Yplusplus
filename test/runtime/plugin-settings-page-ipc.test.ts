@@ -36,7 +36,6 @@ test("native settings IPC exposes only registered plugin settings and validates 
   const store = new PluginSettingsStore({ directory });
   const fonts = new FontStore({ directory: join(directory, "fonts") });
   const audio = new AudioStore({ directory: join(directory, "audio") });
-  const audio = new AudioStore({ directory: join(directory, "audio") });
   const registry = new PluginSettingsPanelRegistry();
   registry.register("dev.example.plugin", definition);
   const service = {
