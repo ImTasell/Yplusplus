@@ -100,3 +100,11 @@ test("an external OAuth popup gets its own document context and no Y++ bridge", 
   assert.ok(appWindow.api);
   assert.equal(popupWindow.api, undefined);
 });
+
+test("Plugins content is isolated beside the native page container", () => {
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('shell.insertBefore(page, closeButton || null)'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('main.hidden = true'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('previousMain !== main'));
+  assert.ok(!YPLUSPLUS_PRELOAD_SOURCE.includes('main.append(page)'));
+  assert.ok(!YPLUSPLUS_PRELOAD_SOURCE.includes('"ss2-page yplusplus-settings-page"'));
+});
