@@ -17,7 +17,7 @@ export interface RpcRequest {
   readonly method: RpcMethod;
   readonly payload: Readonly<Record<string, unknown>>;
 }
-export interface RpcSettingsChangeEvent { readonly rpcVersion: typeof YPLUSPLUS_RPC_VERSION; readonly type: "event"; readonly event: "settings.change"; readonly payload: Readonly<{ key: string; value: RpcSettingValue }>; }
+export interface RpcSettingsChangeEvent { readonly rpcVersion: typeof YPLUSPLUS_RPC_VERSION; readonly type: "event"; readonly event: "settings.change"; readonly payload: Readonly<{ key: string; value: RpcSettingValue }>; }\nexport interface RpcApplicationReadyEvent { readonly rpcVersion: typeof YPLUSPLUS_RPC_VERSION; readonly type: "event"; readonly event: "application.ready"; readonly payload: Readonly<{ timestamp: number }>; }\nexport type RpcPluginEvent = RpcSettingsChangeEvent | RpcApplicationReadyEvent;
 export interface RpcSuccessResponse {
   readonly rpcVersion: typeof YPLUSPLUS_RPC_VERSION;
   readonly type: "response";
