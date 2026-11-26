@@ -8,13 +8,9 @@ export function activate(api) {
     throw new Error("The Hello! application event and audio APIs are unavailable.");
   }
 
-  const unsubscribe = api.events.on("application.ready", () => {
-    void api.audio.playStartup().catch((error) => {
-      api.logger.warn("Could not play the selected startup sound.", {
-        message: error instanceof Error ? error.message : String(error),
-      });
+  api.events.on("application.ready", () => {
+    void api.audio.playStartup().catch(() => {
+      // No configured audio or an autoplay restriction should not break Yapin'.
     });
   });
-
-  api.onCleanup(unsubscribe);
 }
