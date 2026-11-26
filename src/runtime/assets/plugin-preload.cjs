@@ -138,6 +138,7 @@ ipcRenderer.on(CONNECT_CHANNEL, (event, payload) => {
     }
     pending.clear();
     listeners.clear();
+    applicationListeners.clear();
     subscribed.clear();
   };
 
