@@ -75,7 +75,7 @@ function mp3Duration(bytes: Buffer): number {
   return seconds;
 }
 function oggDuration(bytes: Buffer): number {
-  let offset = 0, sampleRate = 0, codec: "vorbis" | "opus" | null = null, lastGranule = 0n, pages = 0;
+  let offset = 0, sampleRate = 0, preSkip = 0, codec: "vorbis" | "opus" | null = null, lastGranule = 0n, pages = 0;
   while (offset + 27 <= bytes.length) {
     if (bytes.toString("ascii", offset, offset + 4) !== "OggS" || bytes[offset + 4] !== 0) {
       throw new TypeError("The Ogg container is malformed.");
@@ -96,6 +96,7 @@ function oggDuration(bytes: Buffer): number {
         sampleRate = packet.readUInt32LE(12);
       } else if (packet.length >= 19 && packet.toString("ascii", 0, 8) === "OpusHead") {
         codec = "opus";
+        preSkip = packet.readUInt16LE(10);
         sampleRate = 48000;
       }
     }
@@ -105,7 +106,8 @@ function oggDuration(bytes: Buffer): number {
   if (offset !== bytes.length || pages < 2 || !codec || !sampleRate || lastGranule <= 0n) {
     throw new TypeError("Only valid Ogg Vorbis or Opus audio files are supported.");
   }
-  return Number(lastGranule) / sampleRate;
+  if (lastGranule < BigInt(preSkip)) throw new TypeError("The Ogg stream has an invalid final granule position.");
+  return Number(lastGranule - BigInt(preSkip)) / sampleRate;
 }
 function inspectAudio(fileName: string, input: Uint8Array): { format: "mp3" | "ogg"; duration: number; mimeType: "audio/mpeg" | "audio/ogg" } {
   if (!(input instanceof Uint8Array) || input.byteLength < 32 || input.byteLength > MAX_AUDIO_BYTES) {
