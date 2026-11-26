@@ -277,6 +277,11 @@ try {
       section.append(styled(element("p", "yplusplus-popup-hint",
         "Import .ttf files, then choose which font Yapin' should use. Files stay in your private Y++ data directory."),
       { fontSize: "12px", opacity: "0.72", lineHeight: "1.5" }));
+      if (!plugin.enabled || plugin.runtimeState !== "ACTIVE") {
+        section.append(styled(element("p", "yplusplus-popup-hint",
+          "Enable Fonts to apply the selected font to Yapin'. You can still manage imported fonts while it is off."),
+        { fontSize: "12px", color: "#f0d69c", lineHeight: "1.5" }));
+      }
 
       const input = element("input", "");
       input.type = "file";
@@ -286,6 +291,13 @@ try {
         if (!event.isTrusted) return;
         const file = input.files && input.files[0];
         if (!file) return;
+        if (file.size > 12 * 1024 * 1024) {
+          const message = element("p", "yplusplus-font-error", "TTF files may not exceed 12 MiB.");
+          styled(message, { color: "#ff9ea8", fontSize: "12px" });
+          section.append(message);
+          input.value = "";
+          return;
+        }
         try {
           const bytes = new Uint8Array(await file.arrayBuffer());
           await pluginActions.importFont(file.name, bytes);
