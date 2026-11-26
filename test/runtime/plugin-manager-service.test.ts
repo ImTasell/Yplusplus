@@ -6,6 +6,7 @@ import { afterEach, test } from "node:test";
 import { PluginApprovalStore } from "../../src/capabilities/approval-store.js";
 import { PluginApprovalController } from "../../src/plugins/approval-controller.js";
 import { PluginTrustStore } from "../../src/plugins/trust-store.js";
+import { PluginEnabledStore } from "../../src/plugins/plugin-enabled-store.js";
 import { PluginManagerService } from "../../src/runtime/plugin-manager-service.js";
 import type { PluginRuntimeHost } from "../../src/runtime/host.js";
 
@@ -53,9 +54,10 @@ async function setup() {
     store: new PluginApprovalStore({ filePath: path.join(config, "permissions.json") }),
     trustStore: new PluginTrustStore({ filePath: path.join(config, "trusted-plugins.json") }),
   });
+  const enabledStore = new PluginEnabledStore({ filePath: path.join(config, "plugin-enabled.json") });
   return {
     pluginRoot,
-    service: new PluginManagerService({ pluginRoot, approvals, runtime }),
+    service: new PluginManagerService({ pluginRoot, approvals, runtime, enabledStore }),
     get starts() { return starts; },
     get unloads() { return unloads; },
   };
@@ -107,5 +109,27 @@ test("revoking trust immediately unloads the plugin runtime", async () => {
   const revoked = await fixture.service.untrust("dev.example.notification", "1.0.0");
   assert.equal(revoked.plugins[0]?.state, "WAITING_FOR_TRUST");
   assert.equal(revoked.plugins[0]?.runtimeState, "UNLOADED");
+  assert.equal(fixture.unloads, 1);
+});
+
+
+test("enable switch persists state and stops or restarts only trusted, approved plugins", async () => {
+  const fixture = await setup();
+  const disabled = await fixture.service.setEnabled("dev.example.notification", "1.0.0", false);
+  assert.equal(disabled.plugins[0]?.enabled, false);
+  await fixture.service.trust("dev.example.notification", "1.0.0");
+  const approved = await fixture.service.approve("dev.example.notification", "1.0.0", ["ui.notifications"]);
+  assert.equal(approved.plugins[0]?.state, "READY");
+  assert.equal(approved.plugins[0]?.enabled, false);
+  assert.equal(fixture.starts, 0, "disabled plugin must not start after trust and approval");
+
+  const enabled = await fixture.service.setEnabled("dev.example.notification", "1.0.0", true);
+  assert.equal(enabled.plugins[0]?.enabled, true);
+  assert.equal(enabled.plugins[0]?.runtimeState, "ACTIVE");
+  assert.equal(fixture.starts, 1);
+
+  const switchedOff = await fixture.service.setEnabled("dev.example.notification", "1.0.0", false);
+  assert.equal(switchedOff.plugins[0]?.enabled, false);
+  assert.equal(switchedOff.plugins[0]?.runtimeState, "UNLOADED");
   assert.equal(fixture.unloads, 1);
 });
