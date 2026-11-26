@@ -221,7 +221,16 @@ export class FontStore {
     if (id !== null && (typeof id !== "string" || !FONT_ID.test(id))) throw new TypeError("Invalid font ID.");
     const operation = this.#queue.then(async () => {
       const current = await this.#read();
-      if (id !== null && !current.fonts.some((font) => font.id === id)) throw new Error("The selected font is not installed.");
+      if (id !== null) {
+        if (!current.fonts.some((font) => font.id === id)) throw new Error("The selected font is not installed.");
+        const file = join(this.directory, id + ".ttf");
+        const info = await lstat(file);
+        if (info.isSymbolicLink() || !info.isFile() || info.size < 12 || info.size > MAX_FONT_BYTES) {
+          throw new Error("The selected font file is missing or unsafe.");
+        }
+        const bytes = await readFile(file);
+        if (bytes.readUInt32BE(0) !== 0x00010000) throw new Error("The selected file is not a valid TrueType font.");
+      }
       await this.#write(Object.freeze({ ...current, activeFontId: id as string | null }));
     });
     this.#queue = operation.catch(() => undefined);
