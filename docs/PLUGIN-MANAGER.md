@@ -87,6 +87,19 @@ Unsupported capabilities are displayed but cannot be approved by this host versi
 - Trust and capability decisions continue to use the existing host-owned stores and `PluginApprovalController`.
 - If Chromium was launched with `--no-sandbox`, the manager window is intentionally not opened.
 
+## Native Settings and Fonts smoke test
+
+- [ ] Open **Settings → Plugins** and confirm it appears between Advanced and Developer.
+- [ ] Click Plugins → Advanced → Plugins repeatedly; no Plugins content should remain in or bleed into Advanced.
+- [ ] Confirm each plugin has an enable switch and gear button.
+- [ ] Turn a trusted plugin off; confirm its runtime unloads and the switch stays off after restarting Yapin'.
+- [ ] Turn it back on; confirm it starts only when trust and required approvals are still valid.
+- [ ] Open a plugin gear popup and edit one registered setting.
+- [ ] Confirm the bundled **Fonts** plugin appears on first launch.
+- [ ] Import a valid `.ttf`, select it, and confirm Yapin's interface changes font.
+- [ ] Turn off **Apply selected font** and confirm the interface returns to its normal font.
+- [ ] Disable Fonts and confirm the selected font is no longer applied.
+- [ ] Try a non-TTF file and a file larger than 12 MiB; both should be rejected.
 ## Smoke test
 
 - [ ] Open Plugin Manager from the Yapin' desktop entry's context menu.
