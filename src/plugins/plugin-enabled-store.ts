@@ -8,7 +8,7 @@ import { randomBytes } from "node:crypto";
 import { chmod, lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-const VERSION = 1 as const;
+const VERSION = 2 as const;
 const ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 
 interface EnableDocument {
@@ -24,16 +24,22 @@ function parse(input: unknown): EnableDocument {
   if (typeof input !== "object" || input === null || Array.isArray(input)) throw new Error("Invalid plugin enable document.");
   const value = input as Record<string, unknown>;
   if (Object.keys(value).sort().join(",") !== "disabled,storeVersion" ||
-      value.storeVersion !== VERSION || !Array.isArray(value.disabled)) {
+      (value.storeVersion !== 1 && value.storeVersion !== VERSION) || !Array.isArray(value.disabled)) {
     throw new Error("Invalid plugin enable document.");
   }
   const seen = new Set<string>();
   const disabled: string[] = [];
   for (const item of value.disabled) {
-    if (typeof item !== "string" || !ID.test(item)) throw new Error("Invalid disabled plugin record.");
-    if (seen.has(item)) throw new Error("Duplicate disabled plugin record.");
-    seen.add(item);
-    disabled.push(item);
+    // Migrate the earlier release-scoped format to stable plugin IDs.
+    const pluginId = value.storeVersion === 1 && typeof item === "object" && item !== null && !Array.isArray(item)
+      ? (item as Record<string, unknown>).pluginId
+      : item;
+    if (typeof pluginId !== "string" || !ID.test(pluginId)) {
+      throw new Error("Invalid disabled plugin record.");
+    }
+    if (seen.has(pluginId)) continue;
+    seen.add(pluginId);
+    disabled.push(pluginId);
   }
   return Object.freeze({ storeVersion: VERSION, disabled: Object.freeze(disabled) });
 }
