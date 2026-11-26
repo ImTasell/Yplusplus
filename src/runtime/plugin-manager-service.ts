@@ -63,7 +63,7 @@ export class PluginManagerService {
 
   async #startIfReady(plugin: ManagedPlugin): Promise<void> {
     if (plugin.state !== "READY" || plugin.trusted !== true) return;
-    if (this.#options.enabledStore && !(await this.#options.enabledStore.isEnabled(plugin.id, plugin.version))) return;
+    if (this.#options.enabledStore && !(await this.#options.enabledStore.isEnabled(plugin.id))) return;
     const current = this.#options.runtime.get(plugin.id);
     if (current && current.state !== "UNLOADED" && current.state !== "FAILED") return;
     await this.#options.runtime.start(plugin);
@@ -76,7 +76,7 @@ export class PluginManagerService {
     const plugins = await Promise.all(report.plugins.map(async (plugin) => {
       const runtimeState = runtime.get(plugin.id)?.state;
       const enabled = this.#options.enabledStore
-        ? await this.#options.enabledStore.isEnabled(plugin.id, plugin.version)
+        ? await this.#options.enabledStore.isEnabled(plugin.id)
         : true;
       return Object.freeze({
         id: plugin.id,
@@ -110,7 +110,7 @@ export class PluginManagerService {
     if (typeof enabled !== "boolean") throw new TypeError("Plugin enabled state must be boolean.");
     if (!this.#options.enabledStore) throw new Error("Persistent plugin enable state is unavailable.");
     await this.#find(pluginId, pluginVersion);
-    await this.#options.enabledStore.setEnabled(pluginId, pluginVersion, enabled);
+    await this.#options.enabledStore.setEnabled(pluginId, enabled);
     if (enabled) {
       const report = await this.#options.approvals.inspect(await this.#discover());
       const ready = report.plugins.find((item) => item.id === pluginId && item.version === pluginVersion);
