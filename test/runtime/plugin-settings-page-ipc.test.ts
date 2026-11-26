@@ -90,6 +90,21 @@ test("native settings IPC exposes only registered plugin settings and validates 
     assert.equal(await activeFont(authorizedEvent), null, "fonts are not exposed until the Fonts plugin is active");
     const removeFont = ipc.handlers.get("yplusplus:settings-page:font-remove")!;
     assert.deepEqual(await removeFont(authorizedEvent, imported[0]!.id), []);
+    const fakeMp3 = new Uint8Array(834);
+    fakeMp3.set([0xff, 0xfb, 0x90, 0x64], 0);
+    fakeMp3.set([0xff, 0xfb, 0x90, 0x64], 417);
+    const importAudio = ipc.handlers.get("yplusplus:settings-page:audio-import")!;
+    const importedAudio = await importAudio(authorizedEvent, "hello.mp3", fakeMp3) as readonly { id: string }[];
+    assert.equal(importedAudio.length, 1);
+    const selectAudio = ipc.handlers.get("yplusplus:settings-page:audio-select")!;
+    await selectAudio(authorizedEvent, importedAudio[0]!.id);
+    const activeAudio = ipc.handlers.get("yplusplus:settings-page:audio-active")!;
+    const selectedAudio = await activeAudio(authorizedEvent) as { id: string; mimeType: string } | null;
+    assert.equal(selectedAudio?.id, importedAudio[0]!.id);
+    assert.equal(selectedAudio?.mimeType, "audio/mpeg");
+    const removeAudio = ipc.handlers.get("yplusplus:settings-page:audio-remove")!;
+    assert.deepEqual(await removeAudio(authorizedEvent, importedAudio[0]!.id), []);
+
   } finally {
     dispose();
     assert.equal(ipc.handlers.size, 0);
