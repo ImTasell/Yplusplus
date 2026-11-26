@@ -33,7 +33,11 @@ try {
         const result = await ipcRenderer.invoke(CHANNELS.set, pluginId, panelId, itemId, value);
         await applyActiveFont();
         return result;
-      },
+      }
+    });
+    // Mutating plugin/font actions stay in the isolated preload closure. The
+    // remote application receives only the read/write-only settings bridge.
+    const pluginActions = Object.freeze({
       setEnabled: async (pluginId, version, enabled) => {
         const result = await ipcRenderer.invoke(CHANNELS.enabled, pluginId, version, enabled);
         await applyActiveFont();
@@ -49,7 +53,8 @@ try {
         const result = await ipcRenderer.invoke(CHANNELS.fontSelect, fontId);
         await applyActiveFont();
         return result;
-      }
+      },
+      activeFont: () => ipcRenderer.invoke(CHANNELS.fontActive)
     });
     contextBridge.exposeInMainWorld("yplusplus", {
       version: VERSION,
@@ -110,7 +115,7 @@ try {
     async function applyActiveFont() {
       const token = ++fontApplyToken;
       try {
-        const font = await ipcRenderer.invoke(CHANNELS.fontActive);
+        const font = await pluginActions.activeFont();
         if (token !== fontApplyToken) return;
         if (!font || typeof FontFace === "undefined" || !document.fonts) {
           clearActiveFont();
@@ -275,7 +280,7 @@ try {
         if (!file) return;
         try {
           const bytes = new Uint8Array(await file.arrayBuffer());
-          await settingsPage.importFont(file.name, bytes);
+          await pluginActions.importFont(file.name, bytes);
           await openPluginSettings(plugin);
         } catch (error) {
           const message = element("p", "yplusplus-font-error",
@@ -290,7 +295,7 @@ try {
         border: "0", borderRadius: "8px", padding: "9px 12px", cursor: "pointer",
         background: "#c8caff", color: "#20223a", fontWeight: "700"
       });
-      importButton.addEventListener("click", () => input.click());
+      importButton.addEventListener("click", (event) => { if (event.isTrusted) input.click(); });
       section.append(importButton, input);
 
       const list = styled(element("div", "yplusplus-font-list"), {
@@ -316,7 +321,7 @@ try {
         });
         useButton.addEventListener("click", async () => {
           try {
-            await settingsPage.setActiveFont(font.id);
+            await pluginActions.setActiveFont(font.id);
             await openPluginSettings(plugin);
           } catch (error) {
             useButton.title = error instanceof Error ? error.message : "Unable to select font.";
@@ -330,7 +335,7 @@ try {
         });
         removeButton.addEventListener("click", async () => {
           try {
-            await settingsPage.removeFont(font.id);
+            await pluginActions.removeFont(font.id);
             await openPluginSettings(plugin);
           } catch (error) {
             removeButton.title = error instanceof Error ? error.message : "Unable to remove font.";
@@ -443,10 +448,11 @@ try {
       toggle.setAttribute("role", "switch");
       toggle.setAttribute("aria-label", "Enable " + plugin.name);
       styled(toggle, { width: "18px", height: "18px", accentColor: "#aeb1ff", cursor: "pointer" });
-      toggle.addEventListener("change", async () => {
+      toggle.addEventListener("change", async (event) => {
+        if (!event.isTrusted) { toggle.checked = Boolean(plugin.enabled); return; }
         toggle.disabled = true;
         try {
-          await settingsPage.setEnabled(plugin.id, plugin.version, toggle.checked);
+          await pluginActions.setEnabled(plugin.id, plugin.version, toggle.checked);
           await renderSettings();
         } catch (error) {
           toggle.checked = Boolean(plugin.enabled);
