@@ -76,6 +76,41 @@ try {
       })
     });
 
+    let startupAudioPlayed = false;
+    ipcRenderer.on("yplusplus:audio:play", async (_event, payload) => {
+      if (startupAudioPlayed || !payload || !(payload.bytes instanceof Uint8Array) ||
+          (payload.mimeType !== "audio/mpeg" && payload.mimeType !== "audio/ogg")) return;
+      const blob = new Blob([payload.bytes], { type: payload.mimeType });
+      const url = URL.createObjectURL(blob);
+      const player = new Audio(url);
+      player.volume = 1;
+      player.addEventListener("ended", () => URL.revokeObjectURL(url), { once: true });
+      player.addEventListener("error", () => URL.revokeObjectURL(url), { once: true });
+      try {
+        await player.play();
+        startupAudioPlayed = true;
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        console.warn("[Y++] Startup audio playback was blocked:", error);
+      }
+    });
+
+    let applicationReadySignalled = false;
+    const signalApplicationReady = () => {
+      if (applicationReadySignalled) return;
+      const topbar = document.querySelector(".topbar");
+      const brand = topbar && topbar.querySelector(".topbar-brand");
+      if (!topbar || !brand || !String(brand.textContent || "").includes("Yapin")) return;
+      applicationReadySignalled = true;
+      ipcRenderer.send("yplusplus:application:ready");
+      applicationReadyObserver.disconnect();
+    };
+    const applicationReadyObserver = new MutationObserver(signalApplicationReady);
+    signalApplicationReady();
+    if (!applicationReadySignalled && document.documentElement) {
+      applicationReadyObserver.observe(document.documentElement, { childList: true, subtree: true });
+    }
+
     if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
     const element = (tag, className, value) => {
       const node = document.createElement(tag);
