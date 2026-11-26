@@ -216,7 +216,7 @@ function createActivationScript(source: string): string {
       if (!pluginModule || typeof pluginModule.activate !== "function") {
         throw new Error("Plugin entry must export an activate() function.");
       }
-      await pluginModule.activate();
+      await pluginModule.activate(window.yplusplus);
       return true;
     } finally {
       URL.revokeObjectURL(url);

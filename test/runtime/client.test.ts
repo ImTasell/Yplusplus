@@ -99,3 +99,92 @@ test("times out unanswered calls and validates client limits", async () => {
   unused.port1.close();
   unused.port2.close();
 });
+
+
+test("client exposes settings get and set through RPC", async () => {
+  const channel = new MessageChannel();
+  const host = port(channel.port1);
+  const client = createPluginApiClient(port(channel.port2));
+  const seen: Array<{ method: string; payload: unknown }> = [];
+  host.addEventListener("message", (event) => {
+    const request = event.data as { requestId: string; method: string; payload: unknown };
+    seen.push({ method: request.method, payload: request.payload });
+    host.postMessage({
+      rpcVersion: 1, type: "response", requestId: request.requestId,
+      ok: true, result: request.method === "settings.get" ? "compact" : null,
+    });
+  });
+  host.start();
+  assert.equal(await client.settings.get("layout", "default"), "compact");
+  await client.settings.set("layout", "compact");
+  assert.deepEqual(seen, [
+    { method: "settings.get", payload: { key: "layout", defaultValue: "default" } },
+    { method: "settings.set", payload: { key: "layout", value: "compact" } },
+  ]);
+  client.close();
+  host.close();
+});
+
+
+test("client receives host settings changes and unsubscribes on disposer", async () => {
+  const channel = new MessageChannel();
+  const host = port(channel.port1);
+  const client = createPluginApiClient(port(channel.port2));
+  let resolveSubscribed!: () => void;
+  let resolveUnsubscribed!: () => void;
+  const subscribed = new Promise<void>((resolve) => { resolveSubscribed = resolve; });
+  const unsubscribed = new Promise<void>((resolve) => { resolveUnsubscribed = resolve; });
+  host.addEventListener("message", (event) => {
+    const request = event.data as { requestId: string; method: string; payload: { key: string } };
+    if (request.method === "settings.subscribe") resolveSubscribed();
+    if (request.method === "settings.unsubscribe") resolveUnsubscribed();
+    host.postMessage({ rpcVersion: 1, type: "response", requestId: request.requestId, ok: true, result: null });
+  });
+  host.start();
+  const values: unknown[] = [];
+  const dispose = client.settings.onChange<number>("scale", (value) => values.push(value));
+  await subscribed;
+  host.postMessage({
+    rpcVersion: 1, type: "event", event: "settings.change",
+    payload: { key: "scale", value: 1.5 },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(values, [1.5]);
+  dispose();
+  await unsubscribed;
+  client.close();
+  host.close();
+});
+
+
+test("client registers declarative settings panels and returns an unregister disposer", async () => {
+  const channel = new MessageChannel();
+  const host = port(channel.port1);
+  const client = createPluginApiClient(port(channel.port2));
+  const seen: Array<{ method: string; payload: unknown }> = [];
+  let resolveUnregistered!: () => void;
+  const unregistered = new Promise<void>((resolve) => { resolveUnregistered = resolve; });
+  host.addEventListener("message", (event) => {
+    const request = event.data as { requestId: string; method: string; payload: unknown };
+    seen.push({ method: request.method, payload: request.payload });
+    host.postMessage({ rpcVersion: 1, type: "response", requestId: request.requestId, ok: true, result: null });
+    if (request.method === "ui.settingsPanel.unregister") resolveUnregistered();
+  });
+  host.start();
+  try {
+    const panel = { id: "general", title: "General", items: [{ type: "toggle" as const, id: "enabled", label: "Enabled", defaultValue: true }] };
+    const dispose = client.ui.registerSettingsPanel(panel);
+    dispose();
+    await Promise.race([
+      unregistered,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Unregister RPC was not sent")), 1_000)),
+    ]);
+    assert.deepEqual(seen, [
+      { method: "ui.settingsPanel.register", payload: { panel } },
+      { method: "ui.settingsPanel.unregister", payload: { panelId: "general" } },
+    ]);
+  } finally {
+    client.close();
+    host.close();
+  }
+});

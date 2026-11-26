@@ -1,0 +1,10 @@
+{
+  "manifestVersion": 1,
+  "id": "dev.yplusplus.fonts",
+  "name": "Fonts",
+  "version": "1.0.0",
+  "description": "Import TrueType fonts and use them throughout Yapin'.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": []
+}

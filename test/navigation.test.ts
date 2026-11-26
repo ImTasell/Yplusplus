@@ -100,3 +100,20 @@ test("an external OAuth popup gets its own document context and no Y++ bridge", 
   assert.ok(appWindow.api);
   assert.equal(popupWindow.api, undefined);
 });
+
+test("Plugins content is isolated beside the native page container", () => {
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('shell.insertBefore(page, closeButton || null)'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('main.hidden = true'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('main.style.setProperty("display", "none", "important")'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('page.style.setProperty("display", "none", "important")'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('previousMain !== main'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('restoreNativeMain()'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('previousMain.style.removeProperty("display")'));
+  assert.ok(!YPLUSPLUS_PRELOAD_SOURCE.includes('main.append(page)'));
+  assert.ok(!YPLUSPLUS_PRELOAD_SOURCE.includes('"ss2-page yplusplus-settings-page"'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('toggle.setAttribute("role", "switch")'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('pluginActions.setEnabled(plugin.id, plugin.version, toggle.checked)'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('gear.setAttribute("aria-label", "Configure " + plugin.name)'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('const openPluginSettings = async (plugin)'));
+  assert.ok(YPLUSPLUS_PRELOAD_SOURCE.includes('const renderFontLibrary = (container, plugin, snapshot)'));
+});

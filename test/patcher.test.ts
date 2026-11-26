@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { encodeAsar, makeIntegrity, parseAsar, readAsarFile } from "../src/asar.js";
-import { PATCH_MARKER, patchAsarBuffer } from "../src/patcher.js";
+import { PATCH_MARKER, PRELOAD_FILENAME, patchAsarBuffer, repatchAppDir } from "../src/patcher.js";
 
 const PACKAGE = Buffer.from(JSON.stringify({ name: "yapper-desktop", version: "1.2.7" }));
 const MAIN = Buffer.from([
@@ -113,6 +113,44 @@ test("AppDir patch creates a backup and restore returns the exact original archi
   }
 });
 
+test("repatches an older embedded preload from the verified original backup", async () => {
+  const { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { patchAppDir } = await import("../src/patcher.js");
+
+  const appDir = mkdtempSync(join(tmpdir(), "yplusplus-repatch-test-"));
+  const resources = join(appDir, "resources");
+  mkdirSync(resources, { recursive: true });
+  const archivePath = join(resources, "app.asar");
+  const original = makeYapperArchive();
+  writeFileSync(archivePath, original);
+
+  try {
+    patchAppDir(appDir);
+    const patched = parseAsar(readFileSync(archivePath));
+    const stalePreload = Buffer.from('"use strict"; // previous Y++ preload');
+    patched.header.files[PRELOAD_FILENAME] = {
+      size: stalePreload.length,
+      offset: String(patched.data.length),
+      integrity: makeIntegrity(stalePreload)
+    };
+    writeFileSync(archivePath, encodeAsar(
+      patched.header,
+      Buffer.concat([patched.data, stalePreload])
+    ));
+
+    assert.equal(repatchAppDir(appDir).status, "patched");
+    const refreshed = parseAsar(readFileSync(archivePath));
+    assert.notDeepEqual(readAsarFile(refreshed, PRELOAD_FILENAME), stalePreload);
+    assert.ok(readAsarFile(refreshed, PRELOAD_FILENAME).toString("utf8").includes("settingsPage"));
+    assert.deepEqual(readFileSync(archivePath + ".yplusplus-original"), original);
+    assert.equal(repatchAppDir(appDir).status, "already-patched");
+  } finally {
+    rmSync(appDir, { recursive: true, force: true });
+  }
+});
+
 test("launch environment removes APPIMAGE to protect extracted AppRun from auto-updater replacement", async () => {
   const { buildLaunchEnvironment } = await import("../src/launcher.js");
   const env = buildLaunchEnvironment("/opt/yplusplus/yapper", {
@@ -124,7 +162,7 @@ test("launch environment removes APPIMAGE to protect extracted AppRun from auto-
   });
   assert.equal(env.APPIMAGE, undefined);
   assert.equal(env.APPDIR, "/opt/yplusplus/yapper");
-  assert.equal(env.YPLUSPLUS_RUNTIME_ENTRY, "/tmp/yplusplus-test-data/yplusplus/runtime/0.1.4/runtime/bootstrap.js");
+  assert.equal(env.YPLUSPLUS_RUNTIME_ENTRY, "/tmp/yplusplus-test-data/yplusplus/runtime/0.1.11/runtime/bootstrap.js");
   assert.equal(env.YPLUSPLUS_PLUGIN_DIR, "/tmp/yplusplus-test-data/yplusplus/plugins");
   assert.ok(env.PATH?.startsWith("/opt/yplusplus/yapper:"));
   assert.ok(env.LD_LIBRARY_PATH?.startsWith("/opt/yplusplus/yapper/usr/lib:"));

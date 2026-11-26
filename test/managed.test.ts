@@ -76,10 +76,21 @@ function makeRuntimeSource(dir: string): void {
   ]) {
     writeFileSync(join(dir, file), "// runtime fixture\n");
   }
-  mkdirSync(join(dir, "runtime"), { recursive: true });
-  writeFileSync(join(dir, "runtime", "bootstrap.js"), "// bootstrap fixture\n");
+  mkdirSync(join(dir, "plugins"), { recursive: true });
+  for (const file of ["plugin-enabled-store.js", "font-store.js"]) {
+    writeFileSync(join(dir, "plugins", file), "// runtime fixture\\n");
+  }
   mkdirSync(join(dir, "runtime", "assets"), { recursive: true });
-  writeFileSync(join(dir, "runtime", "assets", "plugin-host.html"), "<html></html>");
+  for (const file of ["bootstrap.js", "plugin-manager-service.js", "plugin-settings-page-ipc.js", "plugin-manager-window.js"]) {
+    writeFileSync(join(dir, "runtime", file), "// runtime fixture\n");
+  }
+  for (const file of ["plugin-host.html", "plugin-manager.html", "plugin-manager.css", "plugin-manager-renderer.js", "plugin-manager-preload.cjs", "plugin-preload.cjs"]) {
+    writeFileSync(join(dir, "runtime", "assets", file), "/* asset fixture */");
+  }
+  const fontsAsset = join(dir, "runtime", "assets", "builtin-plugins", "fonts");
+  mkdirSync(fontsAsset, { recursive: true });
+  writeFileSync(join(fontsAsset, "yplusplus.plugin.json"), "{}\\n");
+  writeFileSync(join(fontsAsset, "index.js"), "export async function activate() {}\\n");
 }
 
 test("managed paths follow XDG_DATA_HOME and fall back to the user data directory", () => {
@@ -134,12 +145,17 @@ test("managed install patches atomically, installs its runtime and desktop entry
     assert.equal(existsSync(join(first.runtimeDir, "cli.js")), true);
     assert.equal(existsSync(join(first.runtimeDir, "runtime", "bootstrap.js")), true);
     assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-host.html")), true);
+    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-manager.html")), true);
+    assert.equal(existsSync(join(first.runtimeDir, "runtime", "assets", "plugin-manager-preload.cjs")), true);
     assert.equal(JSON.parse(readFileSync(join(first.runtimeDir, "package.json"), "utf8")).type, "module");
 
     const desktop = readFileSync(first.desktopFile, "utf8");
     assert.ok(desktop.includes('Exec="/usr/bin/node"'));
     assert.ok(desktop.includes("Name=Yapin\' (Y++)"));
     assert.ok(desktop.includes("StartupWMClass=Yapin"));
+    assert.ok(desktop.includes("Actions=PluginManager;"));
+    assert.ok(desktop.includes("[Desktop Action PluginManager]"));
+    assert.ok(desktop.includes("--yplusplus-plugin-manager"));
     assert.ok(desktop.includes('"launch"'));
     assert.ok(desktop.includes(`"${first.appDir}"`));
 

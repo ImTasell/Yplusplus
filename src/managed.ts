@@ -15,9 +15,9 @@ import {
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BACKUP_SUFFIX, inspectAppDir, patchAppDir } from "./patcher.js";
+import { BACKUP_SUFFIX, inspectAppDir, patchAppDir, repatchAppDir } from "./patcher.js";
 
-export const YPLUSPLUS_RUNTIME_VERSION = "0.1.4";
+export const YPLUSPLUS_RUNTIME_VERSION = "0.1.11";
 
 const RUNTIME_FILES = [
   "cli.js",
@@ -26,7 +26,20 @@ const RUNTIME_FILES = [
   "patcher.js",
   "asar.js",
   "preload-source.js",
-  "updater.js"
+  "updater.js",
+  "plugins/plugin-enabled-store.js",
+  "plugins/font-store.js",
+  "runtime/plugin-manager-service.js",
+  "runtime/plugin-settings-page-ipc.js",
+  "runtime/plugin-manager-window.js",
+  "runtime/assets/plugin-manager.html",
+  "runtime/assets/plugin-manager.css",
+  "runtime/assets/plugin-manager-renderer.js",
+  "runtime/assets/plugin-manager-preload.cjs",
+  "runtime/assets/plugin-preload.cjs",
+  "runtime/assets/plugin-host.html",
+  "runtime/assets/builtin-plugins/fonts/yplusplus.plugin.json",
+  "runtime/assets/builtin-plugins/fonts/index.js"
 ] as const;
 
 export interface ManagedInstallOptions {
@@ -75,6 +88,7 @@ function escapeDesktopValue(value: string): string {
 
 export function renderDesktopEntry(nodeExecutable: string, cliPath: string, appDir: string): string {
   const exec = [nodeExecutable, cliPath, "launch", appDir].map(quoteDesktopArg).join(" ");
+  const managerExec = [nodeExecutable, cliPath, "launch", appDir, "--yplusplus-plugin-manager"].map(quoteDesktopArg).join(" ");
   return [
     "[Desktop Entry]",
     "Type=Application",
@@ -89,6 +103,12 @@ export function renderDesktopEntry(nodeExecutable: string, cliPath: string, appD
     "DBusActivatable=false",
     "Categories=Network;InstantMessaging;",
     "StartupWMClass=Yapin",
+    "Actions=PluginManager;",
+    "",
+    "[Desktop Action PluginManager]",
+    "Name=Plugin Manager",
+    "Comment=Manage Y++ plugins and permissions",
+    `Exec=${managerExec}`,
     ""
   ].join("\n");
 }
@@ -195,7 +215,6 @@ export function installExtractedAppDir(
     if (existing.name !== inspected.name || existing.version !== inspected.version) {
       throw new Error(`Managed install target already exists with unexpected metadata: ${appDir}`);
     }
-    patchAppDir(appDir);
     const backupPath = existing.archivePath + BACKUP_SUFFIX;
     if (!existsSync(backupPath)) {
       throw new Error("Existing managed installation has no clean Y++ backup; refusing to adopt it.");
@@ -205,6 +224,9 @@ export function installExtractedAppDir(
     if (!previousOriginal.equals(incomingOriginal)) {
       throw new Error("A different ASAR payload uses this Yapper version number; refusing to replace or silently reuse it.");
     }
+    // Rebuild the patched archive from the verified clean backup. This updates
+    // the embedded preload when Y++ changes while preserving the original.
+    repatchAppDir(appDir);
     status = "already-installed";
   } else {
     patchAppDir(sourceAppDir);

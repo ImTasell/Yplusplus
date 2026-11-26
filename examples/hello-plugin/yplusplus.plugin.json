@@ -1,0 +1,10 @@
+{
+  "manifestVersion": 1,
+  "id": "dev.yplusplus.hello",
+  "name": "Hello!",
+  "version": "1.0.0",
+  "description": "Play your own MP3 or OGG sound when Yapin' finishes loading.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": []
+}

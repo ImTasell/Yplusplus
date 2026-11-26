@@ -1,18 +1,17 @@
 /**
  * Sandboxed Y++ plugin preload.
  *
- * Only this narrow capability facade crosses context isolation. Never expose
- * ipcRenderer, Node globals, or the raw MessagePort to plugin page code.
+ * Exposes a narrow capability API through contextBridge. The raw MessagePort,
+ * ipcRenderer, Node globals, and host storage never cross context isolation.
  */
 "use strict";
 
 const { contextBridge, ipcRenderer } = require("electron");
-
 const CONNECT_CHANNEL = "yplusplus:plugin-connect";
 const READY_CHANNEL = "yplusplus:plugin-bridge-ready";
 const REQUEST_TIMEOUT_MS = 10000;
 const MAX_PENDING = 32;
-
+const SETTING_KEY = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 let connected = false;
 
 ipcRenderer.on(CONNECT_CHANNEL, (event, payload) => {
@@ -24,34 +23,18 @@ ipcRenderer.on(CONNECT_CHANNEL, (event, payload) => {
   let nextId = 0;
   let closed = false;
   const pending = new Map();
+  const listeners = new Map();
+  const subscribed = new Set();
+  const applicationListeners = new Set();
 
-  const onMessage = (messageEvent) => {
-    const response = messageEvent.data;
-    if (!response || response.rpcVersion !== 1 || response.type !== "response" ||
-        typeof response.requestId !== "string" || typeof response.ok !== "boolean") return;
-    const item = pending.get(response.requestId);
-    if (!item) return;
-    pending.delete(response.requestId);
-    clearTimeout(item.timer);
-    if (response.ok) item.resolve();
-    else {
-      const error = response.error && typeof response.error.message === "string"
-        ? new Error(response.error.message)
-        : new Error("Y++ capability request failed.");
-      error.name = "PluginApiError";
-      error.code = response.error && typeof response.error.code === "string"
-        ? response.error.code
-        : "INTERNAL_ERROR";
-      item.reject(error);
+  const validKey = (key) => {
+    if (typeof key !== "string" || !SETTING_KEY.test(key)) {
+      throw new TypeError("Invalid Y++ setting key.");
     }
   };
-
-  const request = (input) => {
+  const request = (method, payload) => {
     if (closed) return Promise.reject(new Error("The Y++ plugin session is closed."));
     if (pending.size >= MAX_PENDING) return Promise.reject(new Error("Too many pending Y++ API requests."));
-    if (!input || typeof input.title !== "string" || typeof input.message !== "string") {
-      return Promise.reject(new TypeError("Expected string title and message."));
-    }
     const requestId = "p" + (++nextId);
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -63,19 +46,86 @@ ipcRenderer.on(CONNECT_CHANNEL, (event, payload) => {
       }, REQUEST_TIMEOUT_MS);
       pending.set(requestId, { resolve, reject, timer });
       try {
-        port.postMessage({
-          rpcVersion: 1,
-          type: "request",
-          requestId,
-          method: "capabilities.notifications.show",
-          payload: { title: input.title, message: input.message }
-        });
+        port.postMessage({ rpcVersion: 1, type: "request", requestId, method, payload });
       } catch (_error) {
         pending.delete(requestId);
         clearTimeout(timer);
         reject(new Error("Could not send the Y++ API request."));
       }
     });
+  };
+
+  const onMessage = (messageEvent) => {
+    const message = messageEvent.data;
+    if (!message || message.rpcVersion !== 1) return;
+    if (message.type === "response" && typeof message.requestId === "string" && typeof message.ok === "boolean") {
+      const item = pending.get(message.requestId);
+      if (!item) return;
+      pending.delete(message.requestId);
+      clearTimeout(item.timer);
+      if (message.ok) item.resolve(message.result);
+      else {
+        const error = message.error && typeof message.error.message === "string"
+          ? new Error(message.error.message) : new Error("Y++ API request failed.");
+        error.name = "PluginApiError";
+        error.code = message.error && typeof message.error.code === "string"
+          ? message.error.code : "INTERNAL_ERROR";
+        item.reject(error);
+      }
+      return;
+    }
+    if (message.type === "event" && message.event === "settings.change" &&
+        message.payload && typeof message.payload.key === "string" &&
+        (typeof message.payload.value === "string" || typeof message.payload.value === "boolean" ||
+          (typeof message.payload.value === "number" && Number.isFinite(message.payload.value)))) {
+      const callbacks = listeners.get(message.payload.key);
+      for (const callback of Array.from(callbacks || [])) {
+        try { callback(message.payload.value); } catch (_error) { /* isolate plugin listener errors */ }
+      }
+    }
+    if (message.type === "event" && message.event === "application.ready" &&
+        message.payload && typeof message.payload.timestamp === "number" &&
+        Number.isFinite(message.payload.timestamp)) {
+      for (const callback of Array.from(applicationListeners)) {
+        try { callback(Object.freeze({ timestamp: message.payload.timestamp })); }
+        catch (_error) { /* isolate plugin listener errors */ }
+      }
+    }
+  };
+
+  const subscribe = (key) => request("settings.subscribe", { key }).then(() => {
+    subscribed.add(key);
+    if (!listeners.has(key) && !closed) {
+      subscribed.delete(key);
+      return request("settings.unsubscribe", { key }).catch(() => undefined);
+    }
+  });
+  const onChange = (key, listener) => {
+    validKey(key);
+    if (typeof listener !== "function") throw new TypeError("A settings listener is required.");
+    let callbacks = listeners.get(key);
+    if (!callbacks) { callbacks = new Set(); listeners.set(key, callbacks); }
+    callbacks.add(listener);
+    if (callbacks.size === 1) {
+      void subscribe(key).catch(() => {
+        callbacks.delete(listener);
+        if (callbacks.size === 0) listeners.delete(key);
+      });
+    }
+    let active = true;
+    return () => {
+      if (!active) return;
+      active = false;
+      const current = listeners.get(key);
+      if (!current) return;
+      current.delete(listener);
+      if (current.size === 0) {
+        listeners.delete(key);
+        if (subscribed.delete(key) && !closed) {
+          void request("settings.unsubscribe", { key }).catch(() => undefined);
+        }
+      }
+    };
   };
 
   const onClose = () => {
@@ -87,6 +137,9 @@ ipcRenderer.on(CONNECT_CHANNEL, (event, payload) => {
       item.reject(new Error("The Y++ plugin session is closed."));
     }
     pending.clear();
+    listeners.clear();
+    applicationListeners.clear();
+    subscribed.clear();
   };
 
   port.addEventListener("message", onMessage);
@@ -94,8 +147,62 @@ ipcRenderer.on(CONNECT_CHANNEL, (event, payload) => {
   port.start();
 
   const api = Object.freeze({
+    audio: Object.freeze({
+      playStartup: () => request("audio.playStartup", {}).then(() => undefined)
+    }),
+    events: Object.freeze({
+      on: (eventName, listener) => {
+        if (eventName !== "application.ready" || typeof listener !== "function") {
+          throw new TypeError("Unsupported Y++ application event subscription.");
+        }
+        applicationListeners.add(listener);
+        return () => applicationListeners.delete(listener);
+      }
+    }),
     notifications: Object.freeze({
-      show: (input) => request(input)
+      show: (input) => {
+        if (!input || typeof input.title !== "string" || typeof input.message !== "string") {
+          return Promise.reject(new TypeError("Expected string title and message."));
+        }
+        return request("capabilities.notifications.show", {
+          title: input.title, message: input.message
+        }).then(() => undefined);
+      }
+    }),
+    ui: Object.freeze({
+      registerSettingsPanel: (panel) => {
+        if (!panel || typeof panel !== "object" || Array.isArray(panel) ||
+            typeof panel.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(panel.id)) {
+          throw new TypeError("Invalid Y++ settings panel definition.");
+        }
+        let disposed = false;
+        const registration = request("ui.settingsPanel.register", { panel });
+        void registration.catch(() => undefined);
+        return () => {
+          if (disposed) return;
+          disposed = true;
+          void registration.then(() => request("ui.settingsPanel.unregister", { panelId: panel.id })).catch(() => undefined);
+        };
+      }
+    }),
+    settings: Object.freeze({
+      get: (key, defaultValue) => {
+        validKey(key);
+        if (typeof defaultValue !== "string" && typeof defaultValue !== "boolean" &&
+            !(typeof defaultValue === "number" && Number.isFinite(defaultValue))) {
+          return Promise.reject(new TypeError("Settings defaults must be strings, finite numbers, or booleans."));
+        }
+        return request("settings.get", { key, defaultValue });
+      },
+      set: (key, value) => {
+        validKey(key);
+        if (typeof value !== "string" && typeof value !== "boolean" &&
+            !(typeof value === "number" && Number.isFinite(value))) {
+          return Promise.reject(new TypeError("Settings values must be strings, finite numbers, or booleans."));
+        }
+        return request("settings.set", { key, value }).then(() => undefined);
+      },
+      onChange
     })
   });
 
@@ -103,7 +210,7 @@ ipcRenderer.on(CONNECT_CHANNEL, (event, payload) => {
     contextBridge.exposeInMainWorld("yplusplus", api);
     ipcRenderer.send(READY_CHANNEL, payload.nonce);
   } catch (_error) {
-    closed = true;
+    onClose();
     port.close();
   }
 });

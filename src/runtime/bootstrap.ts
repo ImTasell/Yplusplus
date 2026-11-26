@@ -2,19 +2,29 @@
  * Y++ main-process bootstrap for the managed Yapper installation.
  *
  * This module is dynamically imported by the version-specific BOOT patch.
- * It owns discovery, persistent execution trust, capability approvals,
- * runtime startup, and shutdown.
+ * It owns discovery, trust, approvals, runtime startup, and manager UI.
  */
-import { mkdir } from "node:fs/promises";
+import { cp, lstat, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PluginApprovalController } from "../plugins/approval-controller.js";
+import { PluginSettingsStore } from "../plugins/plugin-settings-store.js";
+import { PluginEnabledStore } from "../plugins/plugin-enabled-store.js";
+import { FontStore } from "../plugins/font-store.js";
+import { AudioStore } from "../plugins/audio-store.js";
+import { PluginSettingsPanelRegistry } from "../plugins/plugin-settings-panel-registry.js";
 import { discoverPlugins } from "../plugins/discovery.js";
 import {
   createElectronPluginRuntimeHost,
   isElectronSandboxDisabled,
   type ElectronPluginRuntimeHostOptions,
 } from "./electron-host.js";
+import { PluginManagerService } from "./plugin-manager-service.js";
+import { installPluginSettingsPageIpc } from "./plugin-settings-page-ipc.js";
+import { installApplicationEventsIpc } from "./application-events-ipc.js";
+import type { PluginRuntimeHost } from "./host.js";
+import { createPluginManagerWindow, type PluginManagerWindowOptions } from "./plugin-manager-window.js";
 
 export interface YplusplusElectronApp {
   readonly commandLine: { hasSwitch(name: string): boolean };
@@ -25,8 +35,8 @@ export interface YplusplusElectronApp {
 
 export interface YplusplusElectronDependencies {
   readonly app: YplusplusElectronApp;
-  readonly BrowserWindow: ElectronPluginRuntimeHostOptions["BrowserWindow"];
-  readonly ipcMain: ElectronPluginRuntimeHostOptions["ipcMain"];
+  readonly BrowserWindow: ElectronPluginRuntimeHostOptions["BrowserWindow"] & PluginManagerWindowOptions["BrowserWindow"];
+  readonly ipcMain: ElectronPluginRuntimeHostOptions["ipcMain"] & PluginManagerWindowOptions["ipcMain"];
   readonly MessageChannelMain: ElectronPluginRuntimeHostOptions["MessageChannelMain"];
   readonly Notification: ElectronPluginRuntimeHostOptions["Notification"];
 }
@@ -39,6 +49,69 @@ export interface YplusplusBootstrapResult {
   readonly waitingForTrust: readonly string[];
   readonly waitingForApproval: readonly string[];
   readonly failed: readonly string[];
+}
+
+
+async function seedBuiltinFontsPlugin(pluginRoot: string): Promise<{ directory: string; source: string; created: boolean }> {
+  const runtimeDirectory = join(dirname(fileURLToPath(import.meta.url)), "assets");
+  const source = join(runtimeDirectory, "builtin-plugins", "fonts");
+  const directory = join(pluginRoot, "dev.yplusplus.fonts");
+  let created = false;
+  try {
+    const info = await lstat(directory);
+    if (info.isSymbolicLink() || !info.isDirectory()) {
+      throw new Error("The built-in Fonts plugin path must be a regular directory.");
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    const stagingRoot = await mkdtemp(join(pluginRoot, ".yplusplus-fonts-"));
+    const stagedPlugin = join(stagingRoot, "plugin");
+    try {
+      await cp(source, stagedPlugin, { recursive: true, errorOnExist: true, force: false });
+      await rename(stagedPlugin, directory);
+      created = true;
+    } finally {
+      await rm(stagingRoot, { recursive: true, force: true });
+    }
+  }
+  return Object.freeze({ directory, source, created });
+}
+
+async function seedBuiltinHelloPlugin(pluginRoot: string): Promise<{ directory: string; source: string; created: boolean }> {
+  const runtimeDirectory = join(dirname(fileURLToPath(import.meta.url)), "assets");
+  const source = join(runtimeDirectory, "builtin-plugins", "hello");
+  const directory = join(pluginRoot, "dev.yplusplus.hello");
+  let created = false;
+  try {
+    const info = await lstat(directory);
+    if (info.isSymbolicLink() || !info.isDirectory()) throw new Error("The built-in Hello! plugin path must be a regular directory.");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    const stagingRoot = await mkdtemp(join(pluginRoot, ".yplusplus-hello-"));
+    const stagedPlugin = join(stagingRoot, "plugin");
+    try {
+      await cp(source, stagedPlugin, { recursive: true, errorOnExist: true, force: false });
+      await rename(stagedPlugin, directory);
+      created = true;
+    } finally {
+      await rm(stagingRoot, { recursive: true, force: true });
+    }
+  }
+  return Object.freeze({ directory, source, created });
+}
+
+async function isUnmodifiedBuiltinFontsPlugin(directory: string, source: string): Promise<boolean> {
+  try {
+    const [installedManifest, bundledManifest, installedEntry, bundledEntry] = await Promise.all([
+      readFile(join(directory, "yplusplus.plugin.json")),
+      readFile(join(source, "yplusplus.plugin.json")),
+      readFile(join(directory, "index.js")),
+      readFile(join(source, "index.js")),
+    ]);
+    return installedManifest.equals(bundledManifest) && installedEntry.equals(bundledEntry);
+  } catch {
+    return false;
+  }
 }
 
 function dataHome(): string {
@@ -54,14 +127,47 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
   await dependencies.app.whenReady();
 
   const root = join(dataHome(), "yplusplus");
+  const audioStore = new AudioStore({ directory: join(root, "audio") });
+  let runtimeRef: PluginRuntimeHost | undefined;
+  let applicationReadyTimestamp: number | undefined;
+  const applicationEvents = installApplicationEventsIpc({
+    ipcMain: dependencies.ipcMain,
+    audio: audioStore,
+    onApplicationReady: (timestamp) => {
+      if (applicationReadyTimestamp !== undefined) return;
+      applicationReadyTimestamp = timestamp;
+      runtimeRef?.emitApplicationReady(timestamp);
+    },
+  });
   const configuredPluginRoot = process.env.YPLUSPLUS_PLUGIN_DIR;
   const pluginRoot = configuredPluginRoot && isAbsolute(configuredPluginRoot)
     ? resolve(configuredPluginRoot)
     : join(root, "plugins");
   await mkdir(pluginRoot, { recursive: true, mode: 0o700 });
+  const builtinFonts = await seedBuiltinFontsPlugin(pluginRoot);
+  const builtinHello = await seedBuiltinHelloPlugin(pluginRoot);
 
   const discovery = await discoverPlugins(pluginRoot);
   const approvals = new PluginApprovalController();
+  const enabledStore = new PluginEnabledStore({ filePath: join(root, "plugin-enabled.json") });
+  const settingsStore = new PluginSettingsStore({ directory: join(root, "plugin-settings") });
+  const fontStore = new FontStore({ directory: join(root, "fonts") });
+  const bundledFonts = discovery.plugins.find((plugin) =>
+    plugin.directory === builtinFonts.directory &&
+    plugin.manifest.id === "dev.yplusplus.fonts" &&
+    plugin.manifest.version === "1.0.0");
+  if (builtinFonts.created && bundledFonts && await isUnmodifiedBuiltinFontsPlugin(builtinFonts.directory, builtinFonts.source)) {
+    await approvals.trust(bundledFonts);
+  }
+  const bundledHello = discovery.plugins.find((plugin) =>
+    plugin.directory === builtinHello.directory &&
+    plugin.manifest.id === "dev.yplusplus.hello" &&
+    plugin.manifest.version === "1.0.0");
+  if (builtinHello.created && bundledHello &&
+      await isUnmodifiedBuiltinFontsPlugin(builtinHello.directory, builtinHello.source)) {
+    await approvals.trust(bundledHello);
+  }
+  const settingsPanelRegistry = new PluginSettingsPanelRegistry();
   const report = await approvals.inspect(discovery);
   const runtime = createElectronPluginRuntimeHost({
     BrowserWindow: dependencies.BrowserWindow,
@@ -69,13 +175,19 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     MessageChannelMain: dependencies.MessageChannelMain,
     Notification: dependencies.Notification,
     getApprovedPermissions: (id, version) => approvals.store.getApprovedPermissions(id, version),
+    settingsStore,
+    settingsPanelRegistry,
+    startupAudio: (plugin) => applicationEvents.playStartupAudio(plugin),
     isSandboxDisabled: () => isElectronSandboxDisabled(dependencies.app),
   });
+  runtimeRef = runtime;
+  if (applicationReadyTimestamp !== undefined) runtime.emitApplicationReady(applicationReadyTimestamp);
 
+  const managerService = new PluginManagerService({ pluginRoot, approvals, runtime, enabledStore });
   const started: string[] = [];
   const failed: string[] = [];
   for (const plugin of report.plugins) {
-    if (plugin.state !== "READY") continue;
+    if (plugin.state !== "READY" || !(await enabledStore.isEnabled(plugin.id))) continue;
     try {
       await runtime.start(plugin);
       started.push(plugin.id);
@@ -89,18 +201,35 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
   const waitingForTrust = report.plugins
     .filter((plugin) => plugin.state === "WAITING_FOR_TRUST")
     .map((plugin) => plugin.id);
-  for (const plugin of waitingForTrust) {
-    console.info(`[Y++] Plugin awaits explicit trust: ${plugin}`);
-  }
+  for (const plugin of waitingForTrust) console.info(`[Y++] Plugin awaits explicit trust: ${plugin}`);
 
   const waitingForApproval = report.plugins
     .filter((plugin) => plugin.state === "WAITING_FOR_APPROVAL")
     .map((plugin) => plugin.id);
-  for (const plugin of waitingForApproval) {
-    console.info(`[Y++] Plugin awaits permission approval: ${plugin}`);
-  }
+  for (const plugin of waitingForApproval) console.info(`[Y++] Plugin awaits permission approval: ${plugin}`);
   for (const rejected of report.rejected) {
     console.warn("[Y++] Rejected plugin directory:", rejected.directory, rejected.issues);
+  }
+
+  const disposeSettingsPageIpc = installPluginSettingsPageIpc({
+    ipcMain: dependencies.ipcMain,
+    service: managerService,
+    registry: settingsPanelRegistry,
+    store: settingsStore,
+    fonts: fontStore,
+    audio: audioStore,
+  });
+  const managerWindow = createPluginManagerWindow({
+    BrowserWindow: dependencies.BrowserWindow,
+    ipcMain: dependencies.ipcMain,
+    service: managerService,
+  });
+  if (process.argv.includes("--yplusplus-plugin-manager")) {
+    if (isElectronSandboxDisabled(dependencies.app)) {
+      console.error("[Y++] Plugin Manager was not opened because Chromium sandboxing is disabled.");
+    } else {
+      void managerWindow.open().catch((error) => console.error("[Y++] Plugin Manager failed to open:", error));
+    }
   }
 
   let shutdownStarted = false;
@@ -117,6 +246,8 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
         }
       })
       .finally(() => {
+        disposeSettingsPageIpc();
+        applicationEvents.dispose();
         allowQuit = true;
         dependencies.app.quit();
       });

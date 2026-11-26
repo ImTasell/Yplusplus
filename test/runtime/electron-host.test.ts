@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import type { ManagedPlugin } from "../../src/plugins/manager.js";
+import { PluginSettingsStore } from "../../src/plugins/plugin-settings-store.js";
 import {
   createElectronPluginRuntimeHost,
   isElectronSandboxDisabled,
@@ -105,6 +106,13 @@ class Window {
         method: "capabilities.notifications.show",
         payload: { title: "Y++ integration", message: "Notification adapter reached." },
       });
+      this.transferred?.postMessage({
+        rpcVersion: 1,
+        type: "request",
+        requestId: "integration-settings-1",
+        method: "settings.set",
+        payload: { key: "layout", value: "compact" },
+      });
       return true;
     },
     isDestroyed: () => this.destroyed,
@@ -165,12 +173,17 @@ test("Electron runtime host connects MessageChannel, capability broker, and nati
   await writeFile(path.join(directory, "index.js"), "export async function activate() {}");
 
   try {
+    const settingsStore = new PluginSettingsStore({ directory: path.join(directory, "settings") });
+    const settingChanged = new Promise<string>((resolve) => {
+      settingsStore.subscribe("dev.example.notification", "layout", (value) => resolve(String(value)));
+    });
     const options: ElectronPluginRuntimeHostOptions = {
       BrowserWindow: Window as unknown as ElectronPluginExecutionOptions["BrowserWindow"],
       ipcMain: ipc as unknown as ElectronPluginExecutionOptions["ipcMain"],
       MessageChannelMain: Channel,
       Notification,
       getApprovedPermissions: async () => new Set(["ui.notifications"]),
+      settingsStore,
       isSandboxDisabled: () => false,
       preloadPath: "/runtime/plugin-preload.cjs",
       bootstrapHtmlPath: "/runtime/plugin-host.html",
@@ -183,6 +196,8 @@ test("Electron runtime host connects MessageChannel, capability broker, and nati
       title: "Y++ integration",
       body: "Notification adapter reached.",
     }]);
+    assert.equal(await settingChanged, "compact");
+    assert.equal(await settingsStore.get("dev.example.notification", "layout", "default"), "compact");
     await host.unload("dev.example.notification");
     assert.equal(host.get("dev.example.notification")?.state, "UNLOADED");
   } finally {

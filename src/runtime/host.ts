@@ -49,6 +49,7 @@ interface RuntimeRecord {
   readonly plugin: ManagedPlugin;
   state: PluginState;
   readonly transport: RpcPortTransport;
+  readonly session: PluginRpcSession;
   readonly pluginPort: RpcMessagePort;
   readonly abortController: AbortController;
   handle?: PluginExecutionHandle;
@@ -66,6 +67,8 @@ export class PluginRuntimeHost {
   readonly #options: PluginRuntimeOptions;
   readonly #records = new Map<string, RuntimeRecord>();
   readonly #startupTimeoutMs: number;
+  #applicationReadyTimestamp: number | undefined;
+  readonly #applicationReadyDelivered = new Set<string>();
 
   constructor(options: PluginRuntimeOptions) {
     this.#options = options;
@@ -93,6 +96,17 @@ export class PluginRuntimeHost {
     })));
   }
 
+  emitApplicationReady(timestamp = Date.now()): void {
+    if (!Number.isFinite(timestamp) || this.#applicationReadyTimestamp !== undefined) return;
+    this.#applicationReadyTimestamp = timestamp;
+    for (const record of this.#records.values()) {
+      if (record.state === "ACTIVE" && !this.#applicationReadyDelivered.has(record.plugin.id)) {
+        this.#applicationReadyDelivered.add(record.plugin.id);
+        record.session.emitApplicationReady(timestamp);
+      }
+    }
+  }
+
   async start(plugin: ManagedPlugin): Promise<PluginRuntimeSnapshot> {
     if (plugin.state !== "READY" || plugin.trusted !== true || !plugin.compatibility.compatible) {
       throw new Error("Only explicitly trusted, compatible READY plugins may be started.");
@@ -107,13 +121,13 @@ export class PluginRuntimeHost {
 
     const channel = this.#options.createChannel();
     let transport: RpcPortTransport;
+    let session: PluginRpcSession;
     try {
       let sessionTimeout: ReturnType<typeof setTimeout> | undefined;
       const sessionPromise = Promise.resolve(this.#options.createSession(plugin));
       const sessionTimedOut = new Promise<never>((_, reject) => {
         sessionTimeout = setTimeout(() => reject(new Error("Plugin session setup timed out.")), this.#startupTimeoutMs);
       });
-      let session: PluginRpcSession;
       try {
         session = await Promise.race([sessionPromise, sessionTimedOut]);
       } finally {
@@ -130,6 +144,7 @@ export class PluginRuntimeHost {
       plugin,
       state: "READY",
       transport,
+      session,
       pluginPort: channel.pluginPort,
       abortController,
       starting: true,
@@ -174,6 +189,10 @@ export class PluginRuntimeHost {
         throw new Error("Plugin exited during initialization.");
       }
       move(record, "ACTIVE");
+      if (this.#applicationReadyTimestamp !== undefined && !this.#applicationReadyDelivered.has(plugin.id)) {
+        this.#applicationReadyDelivered.add(plugin.id);
+        record.session.emitApplicationReady(this.#applicationReadyTimestamp);
+      }
       record.starting = false;
       return this.get(plugin.id)!;
     } catch (error) {
