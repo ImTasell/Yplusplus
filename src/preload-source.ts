@@ -545,6 +545,11 @@ try {
           if (clicked && clicked !== navButton) leavePluginPage();
         }, true);
       }
+      if (selected && previousMain !== main) {
+        previousMain = main;
+        previousMainHidden = main.hidden;
+        main.hidden = true;
+      }
       if (selected && page.hidden) void showPluginPage();
     };
 
