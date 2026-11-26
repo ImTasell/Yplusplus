@@ -48,8 +48,8 @@ function renderPlugin(plugin) {
   names.append(element("div", "plugin-id", plugin.id));
   identity.append(names);
   const active = plugin.runtimeState === "ACTIVE";
-  const status = element("span", "state " + String(active ? "active" : plugin.state).toLowerCase(),
-    active ? "ACTIVE" : plugin.state.replaceAll("_", " "));
+  const statusLabel = active ? "ACTIVE" : !plugin.enabled ? "DISABLED" : plugin.state.replaceAll("_", " ");
+  const status = element("span", "state " + String(statusLabel).toLowerCase().replaceAll(" ", "_"), statusLabel);
   head.append(identity, status);
   card.append(head, element("p", "plugin-desc", "Version " + plugin.version + " · API " + plugin.compatibility.pluginApiVersion));
 
@@ -88,7 +88,7 @@ function renderPlugin(plugin) {
   }
   if (active) {
     actions.append(button("Stop plugin", () => perform(() => api.unload(plugin.id, plugin.version))));
-  } else if (plugin.state === "READY" && plugin.trusted) {
+  } else if (plugin.state === "READY" && plugin.trusted && plugin.enabled) {
     actions.append(button("Start plugin", () => perform(() => api.start(plugin.id, plugin.version)), "primary"));
   }
   card.append(actions);
