@@ -146,13 +146,16 @@ try {
         await renderSettings();
         return;
       }
-      selected = true;
+      const wasSelected = selected;
       const modal = document.querySelector('.modal[aria-label="User settings"]');
       const nav = modal && modal.querySelector(".settings-nav");
       const main = modal && modal.querySelector(".settings-main");
       if (!nav || !main || !page) return;
-      previousMain = main;
-      previousMainHidden = main.hidden;
+      if (!wasSelected || previousMain !== main) {
+        previousMain = main;
+        previousMainHidden = main.hidden;
+      }
+      selected = true;
       main.hidden = true;
       page.hidden = false;
       for (const button of nav.querySelectorAll("button")) {
@@ -161,6 +164,7 @@ try {
       }
       navButton.classList.add("active");
       navButton.setAttribute("aria-current", "page");
+      void applyActiveFont();
       await renderSettings();
     };
 
@@ -174,6 +178,7 @@ try {
       if (previousMain && previousMain.isConnected) previousMain.hidden = previousMainHidden;
       previousMain = null;
       if (page) page.hidden = true;
+      closeSettingsPopup();
     };
 
     const styled = (node, values) => {
@@ -239,7 +244,8 @@ try {
       });
       const status = element("span", "yplusplus-setting-hint", item.description || "");
       styled(status, { opacity: "0.7", fontSize: "11px" });
-      control.addEventListener("change", async () => {
+      control.addEventListener("change", async (event) => {
+        if (!event.isTrusted) return;
         control.disabled = true;
         try {
           const next = item.type === "toggle" ? control.checked :
@@ -275,7 +281,8 @@ try {
       input.type = "file";
       input.accept = ".ttf,font/ttf";
       input.hidden = true;
-      input.addEventListener("change", async () => {
+      input.addEventListener("change", async (event) => {
+        if (!event.isTrusted) return;
         const file = input.files && input.files[0];
         if (!file) return;
         try {
@@ -319,7 +326,8 @@ try {
           border: "0", borderRadius: "7px", padding: "6px 9px",
           background: font.active ? "#31493e" : "#34394a", color: "inherit", cursor: "pointer"
         });
-        useButton.addEventListener("click", async () => {
+        useButton.addEventListener("click", async (event) => {
+          if (!event.isTrusted) return;
           try {
             await pluginActions.setActiveFont(font.id);
             await openPluginSettings(plugin);
@@ -333,7 +341,8 @@ try {
           border: "0", borderRadius: "7px", padding: "6px 9px",
           background: "#48272d", color: "#ffbdc4", cursor: "pointer"
         });
-        removeButton.addEventListener("click", async () => {
+        removeButton.addEventListener("click", async (event) => {
+          if (!event.isTrusted) return;
           try {
             await pluginActions.removeFont(font.id);
             await openPluginSettings(plugin);
