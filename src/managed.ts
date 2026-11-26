@@ -17,7 +17,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BACKUP_SUFFIX, inspectAppDir, patchAppDir, repatchAppDir } from "./patcher.js";
 
-export const YPLUSPLUS_RUNTIME_VERSION = "0.1.7";
+export const YPLUSPLUS_RUNTIME_VERSION = "0.1.8";
 
 const RUNTIME_FILES = [
   "cli.js",
@@ -27,6 +27,8 @@ const RUNTIME_FILES = [
   "asar.js",
   "preload-source.js",
   "updater.js",
+  "plugins/plugin-enabled-store.js",
+  "plugins/font-store.js",
   "runtime/plugin-manager-service.js",
   "runtime/plugin-settings-page-ipc.js",
   "runtime/plugin-manager-window.js",
@@ -35,7 +37,9 @@ const RUNTIME_FILES = [
   "runtime/assets/plugin-manager-renderer.js",
   "runtime/assets/plugin-manager-preload.cjs",
   "runtime/assets/plugin-preload.cjs",
-  "runtime/assets/plugin-host.html"
+  "runtime/assets/plugin-host.html",
+  "runtime/assets/builtin-plugins/fonts/yplusplus.plugin.json",
+  "runtime/assets/builtin-plugins/fonts/index.js"
 ] as const;
 
 export interface ManagedInstallOptions {
