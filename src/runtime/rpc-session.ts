@@ -86,7 +86,7 @@ export class PluginRpcSession {
     }
 
     let operation: Promise<RpcSettingValue | null>;
-    if (request.method === "capabilities.notifications.show") {
+    if (request.method === "audio.playStartup") {\n      const playStartup = this.#facade.audio?.playStartup;\n      if (!playStartup) return rpcFailure(request.requestId, "CAPABILITY_DENIED", "Startup audio is not available to this plugin.");\n      operation = Promise.resolve().then(() => playStartup()).then(() => null);\n    } else if (request.method === "capabilities.notifications.show") {
       const show = this.#facade.notifications?.show;
       if (!show) return rpcFailure(request.requestId, "CAPABILITY_DENIED", "ui.notifications is not available to this plugin.");
       operation = Promise.resolve().then(() => show({ title: request.payload.title as string, message: request.payload.message as string })).then(() => null);
