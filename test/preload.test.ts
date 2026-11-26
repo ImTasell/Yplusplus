@@ -50,6 +50,7 @@ test("exposes the bridge on each exact HTTPS Yapper/Yapin origin", () => {
     assert.equal(result.exposed, true, url);
     assert.equal(result.api?.ready, true, url);
     assert.equal(result.api?.version, "0.1.0", url);
+    assert.equal("settingsPage" in (result.api as object), false, "private IPC helpers are not exposed to website JavaScript");
     assert.deepEqual(JSON.parse(JSON.stringify(result.api?.getStatus())), {
       ready: true,
       version: "0.1.0",
