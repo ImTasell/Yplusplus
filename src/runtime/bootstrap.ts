@@ -4,11 +4,13 @@
  * This module is dynamically imported by the version-specific BOOT patch.
  * It owns discovery, trust, approvals, runtime startup, and manager UI.
  */
-import { mkdir } from "node:fs/promises";
+import { cp, lstat, mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { PluginApprovalController } from "../plugins/approval-controller.js";
 import { PluginSettingsStore } from "../plugins/plugin-settings-store.js";
+import { PluginEnabledStore } from "../plugins/plugin-enabled-store.js";
+import { FontStore } from "../plugins/font-store.js";
 import { PluginSettingsPanelRegistry } from "../plugins/plugin-settings-panel-registry.js";
 import { discoverPlugins } from "../plugins/discovery.js";
 import {
@@ -45,6 +47,37 @@ export interface YplusplusBootstrapResult {
   readonly failed: readonly string[];
 }
 
+
+async function seedBuiltinFontsPlugin(pluginRoot: string): Promise<{ directory: string; source: string }> {
+  const runtimeDirectory = join(dirname(fileURLToPath(import.meta.url)), "assets");
+  const source = join(runtimeDirectory, "builtin-plugins", "fonts");
+  const directory = join(pluginRoot, "fonts");
+  try {
+    const info = await lstat(directory);
+    if (info.isSymbolicLink() || !info.isDirectory()) {
+      throw new Error("The built-in Fonts plugin path must be a regular directory.");
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    await cp(source, directory, { recursive: true, errorOnExist: true, force: false });
+  }
+  return Object.freeze({ directory, source });
+}
+
+async function isUnmodifiedBuiltinFontsPlugin(directory: string, source: string): Promise<boolean> {
+  try {
+    const [installedManifest, bundledManifest, installedEntry, bundledEntry] = await Promise.all([
+      readFile(join(directory, "yplusplus.plugin.json")),
+      readFile(join(source, "yplusplus.plugin.json")),
+      readFile(join(directory, "index.js")),
+      readFile(join(source, "index.js")),
+    ]);
+    return installedManifest.equals(bundledManifest) && installedEntry.equals(bundledEntry);
+  } catch {
+    return false;
+  }
+}
+
 function dataHome(): string {
   const configured = process.env.XDG_DATA_HOME;
   return configured && isAbsolute(configured) ? resolve(configured) : join(homedir(), ".local", "share");
@@ -63,10 +96,20 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     ? resolve(configuredPluginRoot)
     : join(root, "plugins");
   await mkdir(pluginRoot, { recursive: true, mode: 0o700 });
+  const builtinFonts = await seedBuiltinFontsPlugin(pluginRoot);
 
   const discovery = await discoverPlugins(pluginRoot);
   const approvals = new PluginApprovalController();
+  const enabledStore = new PluginEnabledStore({ filePath: join(root, "plugin-enabled.json") });
   const settingsStore = new PluginSettingsStore({ directory: join(root, "plugin-settings") });
+  const fontStore = new FontStore({ directory: join(root, "fonts") });
+  const bundledFonts = discovery.plugins.find((plugin) =>
+    plugin.directory === builtinFonts.directory &&
+    plugin.manifest.id === "dev.yplusplus.fonts" &&
+    plugin.manifest.version === "1.0.0");
+  if (bundledFonts && await isUnmodifiedBuiltinFontsPlugin(builtinFonts.directory, builtinFonts.source)) {
+    await approvals.trust(bundledFonts);
+  }
   const settingsPanelRegistry = new PluginSettingsPanelRegistry();
   const report = await approvals.inspect(discovery);
   const runtime = createElectronPluginRuntimeHost({
@@ -80,10 +123,11 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     isSandboxDisabled: () => isElectronSandboxDisabled(dependencies.app),
   });
 
+  const managerService = new PluginManagerService({ pluginRoot, approvals, runtime, enabledStore });
   const started: string[] = [];
   const failed: string[] = [];
   for (const plugin of report.plugins) {
-    if (plugin.state !== "READY") continue;
+    if (plugin.state !== "READY" || !(await enabledStore.isEnabled(plugin.id, plugin.version))) continue;
     try {
       await runtime.start(plugin);
       started.push(plugin.id);
@@ -107,12 +151,12 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     console.warn("[Y++] Rejected plugin directory:", rejected.directory, rejected.issues);
   }
 
-  const managerService = new PluginManagerService({ pluginRoot, approvals, runtime });
   const disposeSettingsPageIpc = installPluginSettingsPageIpc({
     ipcMain: dependencies.ipcMain,
     service: managerService,
     registry: settingsPanelRegistry,
     store: settingsStore,
+    fonts: fontStore,
   });
   const managerWindow = createPluginManagerWindow({
     BrowserWindow: dependencies.BrowserWindow,
