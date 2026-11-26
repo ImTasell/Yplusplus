@@ -68,6 +68,7 @@ export class PluginRuntimeHost {
   readonly #records = new Map<string, RuntimeRecord>();
   readonly #startupTimeoutMs: number;
   #applicationReadyTimestamp: number | undefined;
+  readonly #applicationReadyDelivered = new Set<string>();
 
   constructor(options: PluginRuntimeOptions) {
     this.#options = options;
@@ -99,7 +100,10 @@ export class PluginRuntimeHost {
     if (!Number.isFinite(timestamp) || this.#applicationReadyTimestamp !== undefined) return;
     this.#applicationReadyTimestamp = timestamp;
     for (const record of this.#records.values()) {
-      if (record.state === "ACTIVE") record.session.emitApplicationReady(timestamp);
+      if (record.state === "ACTIVE" && !this.#applicationReadyDelivered.has(record.plugin.id)) {
+        this.#applicationReadyDelivered.add(record.plugin.id);
+        record.session.emitApplicationReady(timestamp);
+      }
     }
   }
 
@@ -185,7 +189,8 @@ export class PluginRuntimeHost {
         throw new Error("Plugin exited during initialization.");
       }
       move(record, "ACTIVE");
-      if (this.#applicationReadyTimestamp !== undefined) {
+      if (this.#applicationReadyTimestamp !== undefined && !this.#applicationReadyDelivered.has(plugin.id)) {
+        this.#applicationReadyDelivered.add(plugin.id);
         record.session.emitApplicationReady(this.#applicationReadyTimestamp);
       }
       record.starting = false;
