@@ -86,9 +86,10 @@ Panel IDs and item IDs are stable, plugin-local identifiers. The host rejects
 duplicate IDs, unsupported icons, invalid defaults, excessive item counts,
 and malformed definitions.
 
-The trusted Y++ integration renders these definitions inside Yapin's native
-Settings experience. Plugin code does not receive DOM access to the settings
-page and cannot supply arbitrary HTML, CSS, or renderer-side callbacks.
+The trusted Y++ integration renders these definitions in a host-owned
+settings popup opened from the native Settings → Plugins page. Plugin code
+does not receive DOM access to the settings page and cannot supply arbitrary
+HTML, CSS, or renderer-side callbacks.
 Control changes are persisted by the host and delivered through the settings
 subscription API.
 
