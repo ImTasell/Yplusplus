@@ -216,3 +216,16 @@ test("delivers an early application-ready signal when a plugin finishes starting
   runtime.emitApplicationReady(5678);
   assert.deepEqual(sessions[0]?.events, [1234], "application readiness is delivered once");
 });
+
+
+test("does not replay application-ready when a plugin is re-enabled in the same app session", async () => {
+  const workers = [handle(), handle()];
+  let index = 0;
+  const { runtime, sessions } = setup(async () => workers[index++]!.value);
+  await runtime.start(plugin());
+  runtime.emitApplicationReady(4321);
+  assert.deepEqual(sessions[0]?.events, [4321]);
+  await runtime.unload("dev.example.runtime");
+  await runtime.start(plugin());
+  assert.deepEqual(sessions[1]?.events, []);
+});
