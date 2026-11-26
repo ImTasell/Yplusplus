@@ -37,7 +37,7 @@ injected content never uses Yapin's internal page class.
 
 Each discovered plugin has an enable switch and a gear button:
 
-- The switch persists enabled state for the exact plugin ID and version.
+- The switch persists enabled state by stable plugin ID, including across plugin updates.
 - Switching off unloads the plugin runtime. Switching on starts it only when
   the release is already trusted and all requested capabilities are approved.
 - Enabling does not trust a release or approve permissions. Those remain
