@@ -10,7 +10,7 @@ import { dirname, join, resolve } from "node:path";
 
 const VERSION = 1 as const;
 const ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
-const SEMVER = /^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$/;
+const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 
 interface DisabledRelease {
   readonly pluginId: string;
@@ -108,7 +108,7 @@ export class PluginEnabledStore {
       await chmod(directory, 0o700);
       const temporary = join(directory, `.plugin-enabled-${randomBytes(8).toString("hex")}.tmp`);
       try {
-        await writeFile(temporary, JSON.stringify({ storeVersion: VERSION, disabled }, null, 2) + "\\n", {
+        await writeFile(temporary, JSON.stringify({ storeVersion: VERSION, disabled }, null, 2) + "\n", {
           encoding: "utf8", flag: "wx", mode: 0o600,
         });
         await rename(temporary, this.filePath);
