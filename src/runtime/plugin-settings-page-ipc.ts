@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { FontStore } from "../plugins/font-store.js";
 import type { PluginSettingsStore } from "../plugins/plugin-settings-store.js";
 import type { PluginSettingsPanelRegistry, RegisteredSettingsPanel } from "../plugins/plugin-settings-panel-registry.js";
 import type { PluginManagerService } from "./plugin-manager-service.js";
@@ -23,8 +24,14 @@ const CHANNELS = [
   "yplusplus:settings-page:snapshot",
   "yplusplus:settings-page:get",
   "yplusplus:settings-page:set",
+  "yplusplus:settings-page:enabled",
+  "yplusplus:settings-page:font-import",
+  "yplusplus:settings-page:font-remove",
+  "yplusplus:settings-page:font-select",
+  "yplusplus:settings-page:font-active",
 ] as const;
 const ALLOWED_HOSTS = new Set(["www.yapper.website", "yapper.website", "www.yapin.gg", "yapin.gg"]);
+const FONTS_PLUGIN_ID = "dev.yplusplus.fonts";
 
 function isAllowedFrame(event: SettingsPageEvent): boolean {
   if (event.sender.isDestroyed() || !event.senderFrame ||
@@ -61,23 +68,33 @@ function validateValue(item: RegisteredSettingsPanel["panel"]["items"][number], 
   throw new TypeError("The value does not match this plugin setting.");
 }
 
+function isFontBytes(value: unknown): value is Uint8Array {
+  return value instanceof Uint8Array;
+}
+
 export interface PluginSettingsPageIpcOptions {
   readonly ipcMain: SettingsPageIpcMain;
   readonly service: PluginManagerService;
   readonly registry: PluginSettingsPanelRegistry;
   readonly store: PluginSettingsStore;
+  readonly fonts: FontStore;
 }
 
-/** Installs a read/write-only settings bridge; it deliberately has no trust or lifecycle actions. */
+/** Installs a constrained plugin/settings/font bridge for the authenticated Yapper main frame. */
 export function installPluginSettingsPageIpc(options: PluginSettingsPageIpcOptions): () => void {
   const handlers: readonly [string, (event: SettingsPageEvent, ...args: unknown[]) => unknown][] = [
     [CHANNELS[0], async (event) => {
       if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ settings request.");
-      const [snapshot, panels] = await Promise.all([options.service.refresh(), Promise.resolve(options.registry.list())]);
+      const [snapshot, panels, fonts] = await Promise.all([
+        options.service.refresh(),
+        Promise.resolve(options.registry.list()),
+        options.fonts.list(),
+      ]);
       return Object.freeze({
-        plugins: snapshot.plugins.map(({ id, name, version, state, runtimeState }) =>
-          Object.freeze({ id, name, version, state, runtimeState })),
+        plugins: snapshot.plugins.map(({ id, name, version, state, trusted, enabled, runtimeState }) =>
+          Object.freeze({ id, name, version, state, trusted, enabled, runtimeState })),
         panels: panels.map(({ pluginId, panel }) => Object.freeze({ pluginId, panel })),
+        fonts,
       });
     }],
     [CHANNELS[1], async (event, pluginId, panelId, itemId) => {
@@ -97,6 +114,35 @@ export function installPluginSettingsPageIpc(options: PluginSettingsPageIpcOptio
       validateValue(item, value);
       await options.store.set(pluginId, settingKey(panelId, itemId), value as string | number | boolean);
       return null;
+    }],
+    [CHANNELS[3], async (event, pluginId, version, enabled) => {
+      if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ settings request.");
+      return options.service.setEnabled(pluginId, version, enabled);
+    }],
+    [CHANNELS[4], async (event, fileName, bytes) => {
+      if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ font import request.");
+      if (!isFontBytes(bytes)) throw new TypeError("Font upload must contain binary data.");
+      await options.fonts.importFont(fileName, bytes);
+      return options.fonts.list();
+    }],
+    [CHANNELS[5], async (event, fontId) => {
+      if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ font request.");
+      await options.fonts.remove(fontId);
+      return options.fonts.list();
+    }],
+    [CHANNELS[6], async (event, fontId) => {
+      if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ font request.");
+      await options.fonts.setActive(fontId);
+      return options.fonts.list();
+    }],
+    [CHANNELS[7], async (event) => {
+      if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ font request.");
+      const snapshot = await options.service.refresh();
+      const fontsPlugin = snapshot.plugins.find((plugin) => plugin.id === FONTS_PLUGIN_ID);
+      if (!fontsPlugin || !fontsPlugin.enabled || fontsPlugin.runtimeState !== "ACTIVE") return null;
+      const apply = await options.store.get(FONTS_PLUGIN_ID, settingKey("fonts", "apply"), true);
+      if (!apply) return null;
+      return options.fonts.getActive();
     }],
   ];
   for (const [channel, handler] of handlers) options.ipcMain.handle(channel, handler);
