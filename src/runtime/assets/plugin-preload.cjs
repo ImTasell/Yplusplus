@@ -24,7 +24,8 @@ ipcRenderer.on(CONNECT_CHANNEL, (event, payload) => {
   let closed = false;
   const pending = new Map();
   const listeners = new Map();
-  const subscribed = new Set();\n  const applicationListeners = new Set();
+  const subscribed = new Set();
+  const applicationListeners = new Set();
 
   const validKey = (key) => {
     if (typeof key !== "string" || !SETTING_KEY.test(key)) {
@@ -145,7 +146,19 @@ ipcRenderer.on(CONNECT_CHANNEL, (event, payload) => {
   port.start();
 
   const api = Object.freeze({
-    audio: Object.freeze({\n      playStartup: () => request("audio.playStartup", {}).then(() => undefined)\n    }),\n    events: Object.freeze({\n      on: (eventName, listener) => {\n        if (eventName !== "application.ready" || typeof listener !== "function") {\n          throw new TypeError("Unsupported Y++ application event subscription.");\n        }\n        applicationListeners.add(listener);\n        return () => applicationListeners.delete(listener);\n      }\n    }),\n    notifications: Object.freeze({
+    audio: Object.freeze({
+      playStartup: () => request("audio.playStartup", {}).then(() => undefined)
+    }),
+    events: Object.freeze({
+      on: (eventName, listener) => {
+        if (eventName !== "application.ready" || typeof listener !== "function") {
+          throw new TypeError("Unsupported Y++ application event subscription.");
+        }
+        applicationListeners.add(listener);
+        return () => applicationListeners.delete(listener);
+      }
+    }),
+    notifications: Object.freeze({
       show: (input) => {
         if (!input || typeof input.title !== "string" || typeof input.message !== "string") {
           return Promise.reject(new TypeError("Expected string title and message."));
