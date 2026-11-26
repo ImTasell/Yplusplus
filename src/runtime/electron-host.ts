@@ -5,7 +5,7 @@
  * Electron dependency. Pass the real exports from the host application's
  * Electron main process.
  */
-import { createPluginCapabilityFacade } from "../capabilities/broker.js";
+import { createPluginCapabilityFacade, type StartupAudioAdapter } from "../capabilities/broker.js";
 import type { PluginApprovalProvider } from "../plugins/manager.js";
 import type { PluginSettingsStore } from "../plugins/plugin-settings-store.js";
 import type { PluginSettingsPanelRegistry } from "../plugins/plugin-settings-panel-registry.js";
@@ -52,7 +52,7 @@ export interface ElectronPluginRuntimeHostOptions {
   readonly getApprovedPermissions: PluginApprovalProvider;
   /** Shared host-owned persistent settings store; plugin identity is bound internally. */
   readonly settingsStore: PluginSettingsStore;
-  readonly settingsPanelRegistry?: PluginSettingsPanelRegistry;
+  readonly settingsPanelRegistry?: PluginSettingsPanelRegistry;\n  readonly startupAudio?: StartupAudioAdapter;
   /** Must detect --no-sandbox in the actual parent Electron/Chromium process. */
   readonly isSandboxDisabled: () => boolean;
   readonly preloadPath?: string;
@@ -90,7 +90,7 @@ export function createElectronPluginRuntimeHost(
         getApprovedPermissions: options.getApprovedPermissions,
         settingsStore: options.settingsStore,
         ...(options.settingsPanelRegistry ? { settingsPanelRegistry: options.settingsPanelRegistry } : {}),
-        notifications: async (_identity, request) => {
+        ...(options.startupAudio ? { startupAudio: options.startupAudio } : {}),\n        notifications: async (_identity, request) => {
           const notification = new options.Notification({
             title: request.title,
             body: request.message,
