@@ -93,7 +93,7 @@ export class PluginRuntimeHost {
     })));
   }
 
-  async start(plugin: ManagedPlugin): Promise<PluginRuntimeSnapshot> {
+  emitApplicationReady(timestamp = Date.now()): void {\n    for (const record of this.#records.values()) {\n      if (record.state === "ACTIVE") record.session.emitApplicationReady(timestamp);\n    }\n  }\n\n  async start(plugin: ManagedPlugin): Promise<PluginRuntimeSnapshot> {
     if (plugin.state !== "READY" || plugin.trusted !== true || !plugin.compatibility.compatible) {
       throw new Error("Only explicitly trusted, compatible READY plugins may be started.");
     }
