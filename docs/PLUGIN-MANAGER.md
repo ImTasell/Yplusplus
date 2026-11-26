@@ -13,7 +13,7 @@ npm run build
 npm run install-managed -- "$HOME/Downloads/Executables/Yapper-Setup.AppImage"
 ```
 
-The managed runtime is version `0.1.5`. Re-running the managed installer updates the runtime and rewrites the Yapin' desktop entry without replacing an already-managed AppDir with a different payload.
+The managed runtime is version `0.1.8`. Re-running the managed installer updates the runtime and rewrites the Yapin' desktop entry without replacing an already-managed AppDir with a different payload.
 
 ## Open the manager
 
@@ -25,9 +25,47 @@ Terminal fallback:
 
 ```fish
 set APPDIR "$HOME/.local/share/yplusplus/versions/yapper-desktop-1.2.7"
-node "$HOME/.local/share/yplusplus/runtime/0.1.5/cli.js" launch "$APPDIR" --yplusplus-plugin-manager
+node "$HOME/.local/share/yplusplus/runtime/0.1.8/cli.js" launch "$APPDIR" --yplusplus-plugin-manager
 ```
 
+## Native Settings integration
+
+The native **Settings → Plugins** page is kept outside Yapin's own settings-page
+container. Opening it hides the native page container; choosing another native
+settings entry restores the container before Yapin handles the click. The
+injected content never uses Yapin's internal page class.
+
+Each discovered plugin has an enable switch and a gear button:
+
+- The switch persists enabled state for the exact plugin ID and version.
+- Switching off unloads the plugin runtime. Switching on starts it only when
+  the release is already trusted and all requested capabilities are approved.
+- Enabling does not trust a release or approve permissions. Those remain
+  separate actions in Plugin Manager.
+- The gear opens the plugin's host-rendered settings popup. Registered
+  declarative settings panels are rendered there; plugin code does not supply
+  HTML or JavaScript for the popup.
+
+## Built-in Fonts plugin
+
+The first-party **Fonts** plugin is bundled with the managed runtime and seeded
+into the plugin directory on first launch. It has no requested capabilities.
+Its gear popup provides a private TTF library:
+
+- Import TrueType `.ttf` files up to 12 MiB each (64 fonts maximum).
+- Select one imported font for Yapin's interface, or remove fonts.
+- The **Apply selected font** setting can disable font application while
+  keeping the plugin enabled.
+- Font files and metadata are stored under
+  `~/.local/share/yplusplus/fonts` with private directory/file permissions.
+- Imported files are stored under generated names; the original path is not
+  retained. The host validates TTF signatures and never exposes filesystem
+  paths to the plugin.
+
+The Fonts release is automatically trusted only when the host creates its
+initial bundled copy and verifies that its manifest and entry match the
+bundled files. Removing trust remains effective; later launches do not
+silently re-trust an existing plugin directory.
 ## Permission workflow
 
 1. Newly discovered plugins appear as **WAITING FOR TRUST**.
@@ -36,7 +74,7 @@ node "$HOME/.local/share/yplusplus/runtime/0.1.5/cli.js" launch "$APPDIR" --yplu
 4. A plugin becomes runnable only when it is trusted and every requested supported capability has been approved.
 5. **Revoke** on a capability removes that grant. The running plugin's next API call is checked against the updated store and denied.
 6. **Revoke trust** unloads that plugin's current runtime immediately and prevents it from starting again until trusted.
-7. **Stop plugin** unloads a running plugin without changing trust or capability grants. **Start plugin** starts it again only while trust and approvals remain valid.
+7. **Stop plugin** unloads a running plugin without changing trust or capability grants. **Start plugin** starts it again only while trust, enable state, and approvals remain valid.
 
 Unsupported capabilities are displayed but cannot be approved by this host version.
 
