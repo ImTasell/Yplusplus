@@ -63,7 +63,8 @@ try {
     };
 
     let selected = false;
-    let previousVisibility = [];
+    let previousMain = null;
+    let previousMainHidden = false;
     let currentModal = null;
     let navButton = null;
     let page = null;
@@ -79,10 +80,9 @@ try {
       const nav = modal && modal.querySelector(".settings-nav");
       const main = modal && modal.querySelector(".settings-main");
       if (!nav || !main || !page) return;
-      previousVisibility = Array.from(main.children)
-        .filter((child) => child !== page)
-        .map((child) => [child, child.hidden]);
-      for (const [child] of previousVisibility) child.hidden = true;
+      previousMain = main;
+      previousMainHidden = main.hidden;
+      main.hidden = true;
       page.hidden = false;
       for (const button of nav.querySelectorAll("button")) {
         button.classList.remove("active");
@@ -100,10 +100,8 @@ try {
         navButton.classList.remove("active");
         navButton.removeAttribute("aria-current");
       }
-      for (const [child, wasHidden] of previousVisibility) {
-        if (child.isConnected) child.hidden = wasHidden;
-      }
-      previousVisibility = [];
+      if (previousMain && previousMain.isConnected) previousMain.hidden = previousMainHidden;
+      previousMain = null;
       if (page) page.hidden = true;
     };
 
@@ -212,7 +210,8 @@ try {
       const modal = document.querySelector('.modal[aria-label="User settings"]');
       const nav = modal && modal.querySelector(".settings-nav");
       const main = modal && modal.querySelector(".settings-main");
-      if (!modal || !nav || !main) {
+      const shell = main && main.parentElement;
+      if (!modal || !nav || !main || !shell) {
         if (currentModal && !modal) leavePluginPage();
         currentModal = null;
         navButton = null;
@@ -233,10 +232,15 @@ try {
           .find((button) => button.textContent.trim() === "Developer");
         nav.insertBefore(navButton, developer || null);
       }
-      if (!page || !page.isConnected || page.parentElement !== main) {
-        page = element("section", "yplusplus-settings-page");
+      if (!page || !page.isConnected || page.parentElement !== shell) {
+        page = element("section", "yplusplus-settings-content");
         page.hidden = true;
-        main.append(page);
+        page.style.flex = "1 1 0";
+        page.style.minWidth = "0";
+        page.style.overflowY = "auto";
+        page.style.padding = "24px";
+        const closeButton = modal.querySelector(".settings-close");
+        shell.insertBefore(page, closeButton || null);
       }
       if (!nav.dataset.yplusplusBound) {
         nav.dataset.yplusplusBound = "true";
