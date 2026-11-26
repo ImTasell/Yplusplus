@@ -11,7 +11,8 @@ import { fileURLToPath } from "node:url";
 import { PluginApprovalController } from "../plugins/approval-controller.js";
 import { PluginSettingsStore } from "../plugins/plugin-settings-store.js";
 import { PluginEnabledStore } from "../plugins/plugin-enabled-store.js";
-import { FontStore } from "../plugins/font-store.js";\nimport { AudioStore } from "../plugins/audio-store.js";
+import { FontStore } from "../plugins/font-store.js";
+import { AudioStore } from "../plugins/audio-store.js";
 import { PluginSettingsPanelRegistry } from "../plugins/plugin-settings-panel-registry.js";
 import { discoverPlugins } from "../plugins/discovery.js";
 import {
@@ -20,7 +21,8 @@ import {
   type ElectronPluginRuntimeHostOptions,
 } from "./electron-host.js";
 import { PluginManagerService } from "./plugin-manager-service.js";
-import { installPluginSettingsPageIpc } from "./plugin-settings-page-ipc.js";\nimport { installApplicationEventsIpc } from "./application-events-ipc.js";
+import { installPluginSettingsPageIpc } from "./plugin-settings-page-ipc.js";
+import { installApplicationEventsIpc } from "./application-events-ipc.js";
 import { createPluginManagerWindow, type PluginManagerWindowOptions } from "./plugin-manager-window.js";
 
 export interface YplusplusElectronApp {
@@ -112,7 +114,9 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
   const approvals = new PluginApprovalController();
   const enabledStore = new PluginEnabledStore({ filePath: join(root, "plugin-enabled.json") });
   const settingsStore = new PluginSettingsStore({ directory: join(root, "plugin-settings") });
-  const fontStore = new FontStore({ directory: join(root, "fonts") });\n  const audioStore = new AudioStore({ directory: join(root, "audio") });\n  let playStartupAudio: ((plugin: Readonly<{ id: string; version: string }>) => Promise<void>) | undefined;
+  const fontStore = new FontStore({ directory: join(root, "fonts") });
+  const audioStore = new AudioStore({ directory: join(root, "audio") });
+  let playStartupAudio: ((plugin: Readonly<{ id: string; version: string }>) => Promise<void>) | undefined;
   const bundledFonts = discovery.plugins.find((plugin) =>
     plugin.directory === builtinFonts.directory &&
     plugin.manifest.id === "dev.yplusplus.fonts" &&
@@ -130,6 +134,7 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     getApprovedPermissions: (id, version) => approvals.store.getApprovedPermissions(id, version),
     settingsStore,
     settingsPanelRegistry,
+    startupAudio: (plugin) => playStartupAudio ? playStartupAudio(plugin) : Promise.resolve(),
     isSandboxDisabled: () => isElectronSandboxDisabled(dependencies.app),
   });
 
@@ -167,7 +172,14 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     registry: settingsPanelRegistry,
     store: settingsStore,
     fonts: fontStore,
+    audio: audioStore,
   });
+  const applicationEvents = installApplicationEventsIpc({
+    ipcMain: dependencies.ipcMain,
+    runtime,
+    audio: audioStore,
+  });
+  playStartupAudio = applicationEvents.playStartupAudio;
   const managerWindow = createPluginManagerWindow({
     BrowserWindow: dependencies.BrowserWindow,
     ipcMain: dependencies.ipcMain,
@@ -196,6 +208,7 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
       })
       .finally(() => {
         disposeSettingsPageIpc();
+        applicationEvents.dispose();
         allowQuit = true;
         dependencies.app.quit();
       });
