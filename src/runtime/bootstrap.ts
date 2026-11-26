@@ -49,10 +49,11 @@ export interface YplusplusBootstrapResult {
 }
 
 
-async function seedBuiltinFontsPlugin(pluginRoot: string): Promise<{ directory: string; source: string }> {
+async function seedBuiltinFontsPlugin(pluginRoot: string): Promise<{ directory: string; source: string; created: boolean }> {
   const runtimeDirectory = join(dirname(fileURLToPath(import.meta.url)), "assets");
   const source = join(runtimeDirectory, "builtin-plugins", "fonts");
   const directory = join(pluginRoot, "fonts");
+  let created = false;
   try {
     const info = await lstat(directory);
     if (info.isSymbolicLink() || !info.isDirectory()) {
@@ -61,8 +62,9 @@ async function seedBuiltinFontsPlugin(pluginRoot: string): Promise<{ directory: 
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     await cp(source, directory, { recursive: true, errorOnExist: true, force: false });
+    created = true;
   }
-  return Object.freeze({ directory, source });
+  return Object.freeze({ directory, source, created });
 }
 
 async function isUnmodifiedBuiltinFontsPlugin(directory: string, source: string): Promise<boolean> {
@@ -108,7 +110,7 @@ export async function startYplusplusMain(dependencies: YplusplusElectronDependen
     plugin.directory === builtinFonts.directory &&
     plugin.manifest.id === "dev.yplusplus.fonts" &&
     plugin.manifest.version === "1.0.0");
-  if (bundledFonts && await isUnmodifiedBuiltinFontsPlugin(builtinFonts.directory, builtinFonts.source)) {
+  if (builtinFonts.created && bundledFonts && await isUnmodifiedBuiltinFontsPlugin(builtinFonts.directory, builtinFonts.source)) {
     await approvals.trust(bundledFonts);
   }
   const settingsPanelRegistry = new PluginSettingsPanelRegistry();
