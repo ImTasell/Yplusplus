@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { FontStore } from "../plugins/font-store.js";
+import type { AudioStore } from "../plugins/audio-store.js";
 import type { PluginSettingsStore } from "../plugins/plugin-settings-store.js";
 import { validateSettingsPanel, type PluginSettingsPanelRegistry, type RegisteredSettingsPanel } from "../plugins/plugin-settings-panel-registry.js";
 import type { PluginManagerService } from "./plugin-manager-service.js";
@@ -29,6 +30,10 @@ const CHANNELS = [
   "yplusplus:settings-page:font-remove",
   "yplusplus:settings-page:font-select",
   "yplusplus:settings-page:font-active",
+  "yplusplus:settings-page:audio-import",
+  "yplusplus:settings-page:audio-remove",
+  "yplusplus:settings-page:audio-select",
+  "yplusplus:settings-page:audio-active",
 ] as const;
 const ALLOWED_HOSTS = new Set(["www.yapper.website", "yapper.website", "www.yapin.gg", "yapin.gg"]);
 const FONTS_PLUGIN_ID = "dev.yplusplus.fonts";
@@ -97,6 +102,7 @@ export interface PluginSettingsPageIpcOptions {
   readonly registry: PluginSettingsPanelRegistry;
   readonly store: PluginSettingsStore;
   readonly fonts: FontStore;
+  readonly audio: AudioStore;
 }
 
 /** Installs a constrained plugin/settings/font bridge for the authenticated Yapper main frame. */
@@ -104,7 +110,7 @@ export function installPluginSettingsPageIpc(options: PluginSettingsPageIpcOptio
   const handlers: readonly [string, (event: SettingsPageEvent, ...args: unknown[]) => unknown][] = [
     [CHANNELS[0], async (event) => {
       if (!isAllowedFrame(event)) throw new Error("Unauthorized Y++ settings request.");
-      const [snapshot, registeredPanels, fonts] = await Promise.all([
+      const [snapshot, registeredPanels, fonts, audio] = await Promise.all([
         options.service.refresh(),
         Promise.resolve(options.registry.list()),
         options.fonts.list(),
