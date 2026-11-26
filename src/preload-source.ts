@@ -25,6 +25,7 @@ try {
     ALLOWED_HOSTS.has(currentUrl.hostname);
 
   if (process.isMainFrame && isAllowedOrigin) {
+    let applyActiveFont = async () => undefined;
     const settingsPage = Object.freeze({
       refresh: () => ipcRenderer.invoke(CHANNELS.snapshot),
       get: (pluginId, panelId, itemId) =>
@@ -112,7 +113,7 @@ try {
       if (document.documentElement) document.documentElement.style.removeProperty("--yplusplus-font-family");
     };
 
-    async function applyActiveFont() {
+    applyActiveFont = async () => {
       const token = ++fontApplyToken;
       try {
         const font = await pluginActions.activeFont();
@@ -139,7 +140,7 @@ try {
       } catch (error) {
         console.error("[Y++] Could not apply selected font:", error);
       }
-    }
+    };
 
     const showPluginPage = async () => {
       if (selected && page && page.isConnected && !page.hidden) {
