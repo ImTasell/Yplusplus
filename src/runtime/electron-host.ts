@@ -52,7 +52,8 @@ export interface ElectronPluginRuntimeHostOptions {
   readonly getApprovedPermissions: PluginApprovalProvider;
   /** Shared host-owned persistent settings store; plugin identity is bound internally. */
   readonly settingsStore: PluginSettingsStore;
-  readonly settingsPanelRegistry?: PluginSettingsPanelRegistry;\n  readonly startupAudio?: StartupAudioAdapter;
+  readonly settingsPanelRegistry?: PluginSettingsPanelRegistry;
+  readonly startupAudio?: StartupAudioAdapter;
   /** Must detect --no-sandbox in the actual parent Electron/Chromium process. */
   readonly isSandboxDisabled: () => boolean;
   readonly preloadPath?: string;
@@ -90,7 +91,8 @@ export function createElectronPluginRuntimeHost(
         getApprovedPermissions: options.getApprovedPermissions,
         settingsStore: options.settingsStore,
         ...(options.settingsPanelRegistry ? { settingsPanelRegistry: options.settingsPanelRegistry } : {}),
-        ...(options.startupAudio ? { startupAudio: options.startupAudio } : {}),\n        notifications: async (_identity, request) => {
+        ...(options.startupAudio ? { startupAudio: options.startupAudio } : {}),
+        notifications: async (_identity, request) => {
           const notification = new options.Notification({
             title: request.title,
             body: request.message,
