@@ -129,8 +129,8 @@ try {
         appliedFontFace = face;
         if (typeof CSSStyleSheet !== "undefined" && document.adoptedStyleSheets) {
           const sheet = new CSSStyleSheet();
-          sheet.replaceSync("body, body *:not(i):not(svg):not(path):not([class*=icon]):not([class*=Icon]) { font-family: \"" +
-            font.family + "\", sans-serif !important; }");
+          sheet.replaceSync("body, body *:not(i):not(svg):not(path):not([class*=icon]):not([class*=Icon]) { font-family: " +
+            JSON.stringify(font.family) + ", sans-serif !important; }");
           document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
           fontStyleSheet = sheet;
         } else if (document.documentElement) {
