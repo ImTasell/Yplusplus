@@ -6,15 +6,15 @@ import type { PluginSettingsStore, PluginSettingValue } from "../plugins/plugin-
 import type { PluginSettingsPanelRegistry } from "../plugins/plugin-settings-panel-registry.js";
 import type { SettingsPanelDefinition } from "../plugins/api.js";
 export interface NotificationRequest { readonly title: string; readonly message: string; }
-export type NotificationAdapter = (plugin: Readonly<{ id: string; version: string }>, request: NotificationRequest) => void | Promise<void>;
+export type NotificationAdapter = (plugin: Readonly<{ id: string; version: string }>, request: NotificationRequest) => void | Promise<void>;\nexport type StartupAudioAdapter = (plugin: Readonly<{ id: string; version: string }>) => void | Promise<void>;
 export interface CapabilityBrokerOptions {
   readonly getApprovedPermissions: PluginApprovalProvider;
-  readonly notifications: NotificationAdapter;
+  readonly notifications: NotificationAdapter;\n  readonly startupAudio?: StartupAudioAdapter;
   readonly settingsStore?: PluginSettingsStore;
   readonly settingsPanelRegistry?: PluginSettingsPanelRegistry;
 }
 export interface PluginCapabilityFacade {
-  readonly notifications?: Readonly<{ show(request: NotificationRequest): Promise<void> }>;
+  readonly notifications?: Readonly<{ show(request: NotificationRequest): Promise<void> }>;\n  readonly audio?: Readonly<{ playStartup(): Promise<void> }>;
   readonly ui?: Readonly<{ registerSettingsPanel(panel: SettingsPanelDefinition): () => void }>;
   readonly settings?: Readonly<{
     get(key: string, defaultValue: PluginSettingValue): Promise<PluginSettingValue>;
@@ -46,7 +46,7 @@ export async function createPluginCapabilityFacade(plugin: ManagedPlugin, option
   }
   const requested = new Set(plugin.requestedPermissions);
   const approved = await options.getApprovedPermissions(plugin.id, plugin.version);
-  const facade: { notifications?: NonNullable<PluginCapabilityFacade["notifications"]>; settings?: NonNullable<PluginCapabilityFacade["settings"]>; ui?: NonNullable<PluginCapabilityFacade["ui"]> } = {};
+  const facade: { notifications?: NonNullable<PluginCapabilityFacade["notifications"]>; audio?: NonNullable<PluginCapabilityFacade["audio"]>; settings?: NonNullable<PluginCapabilityFacade["settings"]>; ui?: NonNullable<PluginCapabilityFacade["ui"]> } = {};
   if (requested.has("ui.notifications") && approved.has("ui.notifications")) {
     facade.notifications = Object.freeze({ show: async (input: NotificationRequest) => {
       const current = await options.getApprovedPermissions(plugin.id, plugin.version);
@@ -54,7 +54,7 @@ export async function createPluginCapabilityFacade(plugin: ManagedPlugin, option
       await options.notifications(Object.freeze({ id: plugin.id, version: plugin.version }), normalizeNotification(input));
     } });
   }
-  if (options.settingsPanelRegistry) {
+  if (plugin.id === "dev.yplusplus.hello" && options.startupAudio) {\n    facade.audio = Object.freeze({ playStartup: async () => {\n      await options.startupAudio!(Object.freeze({ id: plugin.id, version: plugin.version }));\n    } });\n  }\n  if (options.settingsPanelRegistry) {
     const pluginId = plugin.id;
     facade.ui = Object.freeze({ registerSettingsPanel: (panel: SettingsPanelDefinition) => options.settingsPanelRegistry!.register(pluginId, panel) });
   }
