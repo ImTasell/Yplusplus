@@ -12,6 +12,7 @@ import { join, resolve } from "node:path";
 const DOCUMENT_VERSION = 1 as const;
 const FONT_ID = /^[a-f0-9]{32}$/;
 const MAX_FONT_BYTES = 12 * 1024 * 1024;
+const MAX_FONTS = 64;
 
 interface FontRecord {
   readonly id: string;
@@ -195,6 +196,7 @@ export class FontStore {
     const operation = this.#queue.then(async () => {
       await this.#ensureDirectory();
       const current = await this.#read();
+      if (current.fonts.length >= MAX_FONTS) throw new RangeError("The font library can contain at most 64 fonts.");
       const temporary = join(this.directory, "." + id + ".tmp");
       try {
         await writeFile(temporary, bytes, { flag: "wx", mode: 0o600 });
@@ -235,12 +237,12 @@ export class FontStore {
       const file = join(this.directory, id + ".ttf");
       const info = await lstat(file);
       if (info.isSymbolicLink() || !info.isFile()) throw new Error("Font file must be a regular, non-symlink file.");
-      await unlink(file);
       await this.#write(Object.freeze({
         version: DOCUMENT_VERSION,
         activeFontId: current.activeFontId === id ? null : current.activeFontId,
         fonts: Object.freeze(current.fonts.filter((item) => item.id !== id)),
       }));
+      await unlink(file);
     });
     this.#queue = operation.catch(() => undefined);
     return operation;
